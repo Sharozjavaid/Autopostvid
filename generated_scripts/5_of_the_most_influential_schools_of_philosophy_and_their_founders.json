@@ -1,0 +1,50 @@
+{
+    "script": "Have you ever felt a sudden shiver, suspecting the world isn't quite what it seems? You are walking a path traveled by giants. Plato stood at the mouth of a dark cave, warning that you might be watching mere shadows while the brilliant truth awaits outside. Aristotle examined the complexity of nature, insisting that a specific purpose lives within you, just as an acorn holds the blueprint of a mighty oak. When life became a storm, Zeno and the Stoics built an unshakeable fortress within the mind, proving peace is a choice, not a circumstance. Lao Tzu simply watched the water flow, teaching that true strength comes from softness and moving with nature's ancient rhythm. And Sartre placed the universe in your hands, revealing you are terrifyingly free to design your own soul. The journey is yours. Dive deeper into philosophy with our app.",
+    "scenes": [
+        {
+            "scene_number": 1,
+            "text": "Have you ever felt a sudden shiver, suspecting the world isn't quite what it seems? You are walking a path traveled by giants.",
+            "visual_description": "A close-up, cinematic shot of a young person looking into an antique mirror in a dimly lit room, their reflection slightly distorted, symbolizing self-inquiry.",
+            "duration": "8"
+        },
+        {
+            "scene_number": 2,
+            "text": "Plato stood at the mouth of a dark cave, warning that you might be watching mere shadows while the brilliant truth awaits outside.",
+            "visual_description": "A split composition: on the left, dark silhouettes of people watching shadows on a stone wall; on the right, a blindingly bright exit into a lush, real world.",
+            "duration": "9"
+        },
+        {
+            "scene_number": 3,
+            "text": "Aristotle examined the complexity of nature, insisting that a specific purpose lives within you, just as an acorn holds the blueprint of a mighty oak.",
+            "visual_description": "A time-lapse style illustration showing a glowing golden acorn rapidly sprouting and transforming into a massive, ancient oak tree against a sunset.",
+            "duration": "9"
+        },
+        {
+            "scene_number": 4,
+            "text": "When life became a storm, Zeno and the Stoics built an unshakeable fortress within the mind, proving peace is a choice, not a circumstance.",
+            "visual_description": "A marble statue of a Stoic philosopher standing perfectly still and calm while violent ocean waves crash over it.",
+            "duration": "9"
+        },
+        {
+            "scene_number": 5,
+            "text": "Lao Tzu simply watched the water flow, teaching that true strength comes from softness and moving with nature's ancient rhythm.",
+            "visual_description": "A serene, misty landscape painting in ink-wash style, showing a river winding effortlessly around hard rocks in a canyon.",
+            "duration": "8"
+        },
+        {
+            "scene_number": 6,
+            "text": "And Sartre placed the universe in your hands, revealing you are terrifyingly free to design your own soul.",
+            "visual_description": "A silhouette of a person standing at a crossroads in a surreal, foggy void, looking down at their glowing hands as if molding light.",
+            "duration": "9"
+        },
+        {
+            "scene_number": 7,
+            "text": "The journey is yours. Dive deeper into philosophy with our app.",
+            "visual_description": "A sleek smartphone rests on an old wooden library desk; the screen glows showcasing the philosophy app icon, with dust motes dancing in the light.",
+            "duration": "6"
+        }
+    ],
+    "hook": "Have you ever felt a sudden shiver, suspecting the world isn't quite what it seems?",
+    "app_promotion": "Dive deeper into philosophy with our app.",
+    "title": "5 of the most influential schools of philosophy and their founders "
+}

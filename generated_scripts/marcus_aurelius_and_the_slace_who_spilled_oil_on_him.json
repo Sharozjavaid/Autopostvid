@@ -1,0 +1,97 @@
+{
+    "script": "Imagine having boiling oil spilled on your bare skin and not even flinching. This actually happened to the most powerful man in the world, Marcus Aurelius. He was relaxing in a bath when a nervous slave slipped. A heavy pitcher of scalding hot oil crashed down, burning the Emperor\u2019s chest. The room went silent. Guards drew their swords. The slave fell to his knees, waiting for death. But Marcus didn\u2019t scream. He didn\u2019t rage. He took a deep breath, looked at the shaking boy, and simply said: \"It seems you have spilled the oil.\" That\u2019s it. Marcus knew that anger wouldn't heal his burns. It would only poison his soul. You cannot control what happens to you, only how you respond. So next time the world burns you, don't add fuel to the fire. Stay cool.",
+    "scenes": [
+        {
+            "scene_number": 1,
+            "text": "Imagine having boiling oil spilled on your bare skin",
+            "visual_description": "Hyper-realistic extreme close-up of golden, boiling oil splashing in slow motion. High contrast, cinematic lighting.",
+            "duration": "4"
+        },
+        {
+            "scene_number": 2,
+            "text": "and not even flinching.",
+            "visual_description": "A stone statue of a Roman face staring directly ahead, completely unmoving while sparks fly around it.",
+            "duration": "3"
+        },
+        {
+            "scene_number": 3,
+            "text": "This actually happened to the most powerful man in the world, Marcus Aurelius.",
+            "visual_description": "Cinematic shot of Marcus Aurelius in imperial robes, looking stoic and powerful, standing in a marble hall.",
+            "duration": "5"
+        },
+        {
+            "scene_number": 4,
+            "text": "He was relaxing in a bath when a nervous slave slipped.",
+            "visual_description": "A lavish ancient Roman bathhouse with steam rising. A young servant looks terrified and loses his footing.",
+            "duration": "4"
+        },
+        {
+            "scene_number": 5,
+            "text": "A heavy pitcher of scalding hot oil crashed down,",
+            "visual_description": "Close up of an ornate clay pitcher falling through the air, liquid spilling out, milliseconds before impact.",
+            "duration": "3"
+        },
+        {
+            "scene_number": 6,
+            "text": "burning the Emperor\u2019s chest.",
+            "visual_description": "Reaction shot of Marcus Aurelius wincing slightly but tightening his jaw, steam rising from his skin.",
+            "duration": "3"
+        },
+        {
+            "scene_number": 7,
+            "text": "The room went silent. Guards drew their swords.",
+            "visual_description": "Roman Praetorian guards instantly pulling swords from sheaths, aggressive stance, motion blur.",
+            "duration": "3"
+        },
+        {
+            "scene_number": 8,
+            "text": "The slave fell to his knees, waiting for death.",
+            "visual_description": "Top-down angle of the servant huddled on the wet floor, hands covering his head, trembling.",
+            "duration": "4"
+        },
+        {
+            "scene_number": 9,
+            "text": "But Marcus didn\u2019t scream. He didn\u2019t rage.",
+            "visual_description": "Extreme close-up on Marcus\u2019s eyes. They are calm, intense, and focused. No anger.",
+            "duration": "4"
+        },
+        {
+            "scene_number": 10,
+            "text": "He took a deep breath, looked at the shaking boy, and simply said:",
+            "visual_description": "Marcus raises a hand to stop the guards. The camera focuses on his mouth about to speak.",
+            "duration": "5"
+        },
+        {
+            "scene_number": 11,
+            "text": "\"It seems you have spilled the oil.\" That\u2019s it.",
+            "visual_description": "Bold text overlay on screen: 'IT SEEMS YOU SPILLED THE OIL.' Background is a dark, moody Roman atmosphere.",
+            "duration": "5"
+        },
+        {
+            "scene_number": 12,
+            "text": "Marcus knew that anger wouldn't heal his burns. It would only poison his soul.",
+            "visual_description": "Split screen: Left side shows a red angry face screaming, Right side shows a blue calm face at peace.",
+            "duration": "6"
+        },
+        {
+            "scene_number": 13,
+            "text": "You cannot control what happens to you, only how you respond.",
+            "visual_description": "A man standing firm while a massive ocean wave crashes over him, he remains standing.",
+            "duration": "5"
+        },
+        {
+            "scene_number": 14,
+            "text": "So next time the world burns you, don't add fuel to the fire.",
+            "visual_description": "A hand holding a match about to drop it, but then blowing the flame out instead.",
+            "duration": "4"
+        },
+        {
+            "scene_number": 15,
+            "text": "Stay cool.",
+            "visual_description": "Final shot of a marble bust of Marcus Aurelius fading to black.",
+            "duration": "2"
+        }
+    ],
+    "hook": "Imagine having boiling oil spilled on your bare skin and not even flinching.",
+    "title": "marcus aurelius and the slace who spilled oil on him"
+}

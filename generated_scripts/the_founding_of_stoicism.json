@@ -1,0 +1,50 @@
+{
+    "script": "Imagine watching your entire life sink into the dark, unforgiving ocean. That is exactly what happened to Zeno, a wealthy merchant who had everything to lose. In a single violent storm, his ship, his vast fortune, and his planned future were destroyed. He washed ashore in Athens with nothing but the wet clothes on his back. Most men would scream at the heavens in despair. But Zeno did something strange. He wandered into a bookstore and discovered the words of Socrates. There, he realized a profound truth: while the sea could take his gold, it could never touch his mind. He began teaching on a painted porch, or 'Stoa,' sharing that true power isn't controlling the world, but controlling your reaction to it. You don't need a shipwreck to find this kind of unshakeable peace. The wisdom of the ages is waiting for you right now. Dive deeper into philosophy with our app.",
+    "scenes": [
+        {
+            "scene_number": 1,
+            "text": "Imagine watching your entire life sink into the dark, unforgiving ocean. That is exactly what happened to Zeno, a wealthy merchant who had everything to lose.",
+            "visual_description": "A dramatic, stormy seascape at night with jagged lightning illuminating the silhouette of a sinking ancient Greek merchant ship. A single crate of gold is sinking into the deep blue abyss.",
+            "duration": 8
+        },
+        {
+            "scene_number": 2,
+            "text": "In a single violent storm, his ship, his vast fortune, and his planned future were destroyed. He washed ashore in Athens with nothing but the wet clothes on his back.",
+            "visual_description": "A lone, exhausted man lying on a sandy beach at dawn, coughing up water. In the background, the sun rises over the distant, majestic silhouette of the Acropolis in Athens.",
+            "duration": 9
+        },
+        {
+            "scene_number": 3,
+            "text": "Most men would scream at the heavens in despair. But Zeno did something strange. He wandered into a bookstore and discovered the words of Socrates.",
+            "visual_description": "Zeno, now dry but wearing simple ragged clothes, standing inside an ancient scroll shop. Shafts of dusty sunlight hit a scroll he is unrolling, his expression curious rather than sad.",
+            "duration": 8
+        },
+        {
+            "scene_number": 4,
+            "text": "There, he realized a profound truth: while the sea could take his gold, it could never touch his mind.",
+            "visual_description": "A cinematic close-up of Zeno's eyes. Overlaid on his silhouette is a graphic representation of a calm, glowing geometric shape representing the mind, contrasting with a chaotic ocean background.",
+            "duration": 7
+        },
+        {
+            "scene_number": 5,
+            "text": "He began teaching on a painted porch, or 'Stoa,' sharing that true power isn't controlling the world, but controlling your reaction to it.",
+            "visual_description": "Zeno, looking older and wiser with a beard, standing by colorful painted columns (the Stoa Poikile). He is gesturing calmly to a small group of attentive students wearing togas.",
+            "duration": 9
+        },
+        {
+            "scene_number": 6,
+            "text": "You don't need a shipwreck to find this kind of unshakeable peace. The wisdom of the ages is waiting for you right now.",
+            "visual_description": "Transition to modern day. A young person sitting on a park bench in a busy city, looking peaceful and centered amidst blurred, fast-moving crowds, holding a smartphone.",
+            "duration": 8
+        },
+        {
+            "scene_number": 7,
+            "text": "Dive deeper into philosophy with our app.",
+            "visual_description": "The smartphone screen comes into focus showing the app interface with a 'Start Learning' button, followed by the app logo appearing on a clean, minimalist background.",
+            "duration": 5
+        }
+    ],
+    "hook": "Imagine watching your entire life sink into the dark, unforgiving ocean.",
+    "app_promotion": "Dive deeper into philosophy with our app.",
+    "title": "the founding of stoicism "
+}

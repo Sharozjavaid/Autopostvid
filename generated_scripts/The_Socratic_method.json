@@ -1,0 +1,91 @@
+{
+    "script": "The most annoying man in history invented a mind-hack so powerful, the government executed him for it. It\u2019s called the Socratic Method. While everyone else screams their opinions, Socrates did the opposite. He played dumb. He asked simple questions like 'What is justice?' or 'What is courage?' When people answered, he didn't fight back. He asked another question. And another. Until their entire argument fell apart. It\u2019s verbal jiu-jitsu. You don\u2019t attack the person; you let them destroy their own logic. By the end, they think the truth was their idea all along. Next time you disagree, stop preaching. Start asking. True power isn't forcing an answer; it\u2019s controlling the questions.",
+    "scenes": [
+        {
+            "scene_number": 1,
+            "text": "The most annoying man in history invented a mind-hack so powerful,",
+            "visual_description": "Hyper-realistic close-up of a marble statue of Socrates, but with modern, glowing red eyes.",
+            "duration": 4
+        },
+        {
+            "scene_number": 2,
+            "text": "the government executed him for it.",
+            "visual_description": "Dramatic painting 'The Death of Socrates' zoomed in sharply on the hand holding the cup of poison.",
+            "duration": 3
+        },
+        {
+            "scene_number": 3,
+            "text": "It\u2019s called the Socratic Method.",
+            "visual_description": "Large, bold text 'THE SOCRATIC METHOD' appearing over a black background with a glitch effect.",
+            "duration": 3
+        },
+        {
+            "scene_number": 4,
+            "text": "While everyone else screams their opinions,",
+            "visual_description": "Fast montage of angry politicians or people yelling on TV debates, chaotic energy.",
+            "duration": 4
+        },
+        {
+            "scene_number": 5,
+            "text": "Socrates did the opposite. He played dumb.",
+            "visual_description": "An illustration of Socrates shrugging his shoulders with a confused, innocent look.",
+            "duration": 4
+        },
+        {
+            "scene_number": 6,
+            "text": "He asked simple questions like 'What is justice?' or 'What is courage?'",
+            "visual_description": "Speech bubbles popping up rapidly around a Greek philosopher silhouette: 'Justice?', 'Good?', 'Truth?'.",
+            "duration": 5
+        },
+        {
+            "scene_number": 7,
+            "text": "When people answered, he didn't fight back.",
+            "visual_description": "A Roman soldier shouting confidently while Socrates stands calmly with hands behind his back.",
+            "duration": 4
+        },
+        {
+            "scene_number": 8,
+            "text": "He asked another question. And another.",
+            "visual_description": "Quick cuts of question marks hitting a brick wall until the wall cracks.",
+            "duration": 3
+        },
+        {
+            "scene_number": 9,
+            "text": "Until their entire argument fell apart.",
+            "visual_description": "A stone pillar crumbling into dust in slow motion.",
+            "duration": 4
+        },
+        {
+            "scene_number": 10,
+            "text": "It\u2019s verbal jiu-jitsu.",
+            "visual_description": "Cinematic shot of two judo fighters, one using the other's weight to flip them over effortlessly.",
+            "duration": 3
+        },
+        {
+            "scene_number": 11,
+            "text": "You don\u2019t attack the person; you let them destroy their own logic.",
+            "visual_description": "Animation of a complex knot untying itself and falling straight.",
+            "duration": 5
+        },
+        {
+            "scene_number": 12,
+            "text": "By the end, they think the truth was their idea all along.",
+            "visual_description": "A lightbulb turning on inside a translucent human head.",
+            "duration": 4
+        },
+        {
+            "scene_number": 13,
+            "text": "Next time you disagree, stop preaching. Start asking.",
+            "visual_description": "Split screen: Left side person yelling (crossed out), Right side person listening intently (green checkmark).",
+            "duration": 5
+        },
+        {
+            "scene_number": 14,
+            "text": "True power isn't forcing an answer; it\u2019s controlling the questions.",
+            "visual_description": "Extreme close-up on an eye opening, reflecting a galaxy or deep space.",
+            "duration": 5
+        }
+    ],
+    "hook": "The most annoying man in history invented a mind-hack so powerful, the government executed him for it.",
+    "title": "The Socratic method "
+}

@@ -1,0 +1,56 @@
+{
+    "script": "Friedrich Nietzsche came up with the single most terrifying thought experiment in history. It\u2019s called the Eternal Recurrence. Imagine a demon creeps up to you right now and whispers: 'This life you live, you must live it once more and innumerable times more.' Every pain, every joy, every mistake, and this exact second\u2014repeated infinitely forever. There is nothing new. Just the same movie on loop. Would you throw yourself down and scream in horror? Or would you welcome it? Here is the twist: Nietzsche didn't say this is actually true. He designed it as the ultimate test of your character. If the thought scares you, you need to change your path. The goal is to become the Superman\u2014someone who loves life so much they would crave the infinite replay. Don't just survive time, conquer it. Dive deeper into philosophy with our app.",
+    "scenes": [
+        {
+            "scene_number": 1,
+            "text": "Friedrich Nietzsche came up with the single most terrifying thought experiment in history.",
+            "visual_description": "Hyper-realistic portrait of Friedrich Nietzsche with intense eyes, dramatic lighting, dark background, slight zoom in.",
+            "duration": "5"
+        },
+        {
+            "scene_number": 2,
+            "text": "It\u2019s called the Eternal Recurrence. Imagine a demon creeps up to you right now and whispers:",
+            "visual_description": "A shadowy, smoky silhouette of a demon whispering into the ear of a modern person looking at a smartphone, dark moody atmosphere.",
+            "duration": "6"
+        },
+        {
+            "scene_number": 3,
+            "text": "'This life you live, you must live it once more and innumerable times more.'",
+            "visual_description": "An infinite hall of mirrors reflection showing the same person repeating endlessly into the distance.",
+            "duration": "6"
+        },
+        {
+            "scene_number": 4,
+            "text": "Every pain, every joy, every mistake, and this exact second\u2014repeated infinitely forever. There is nothing new. Just the same movie on loop.",
+            "visual_description": "Fast montage of human emotions: crying, laughing, falling, running, overlaid with a vintage film reel effect spinning rapidly.",
+            "duration": "9"
+        },
+        {
+            "scene_number": 5,
+            "text": "Would you throw yourself down and scream in horror? Or would you welcome it?",
+            "visual_description": "Split screen: On the left, a person on their knees clutching their head in despair. On the right, a person standing stoic and smiling at a sunset.",
+            "duration": "6"
+        },
+        {
+            "scene_number": 6,
+            "text": "Here is the twist: Nietzsche didn't say this is actually true. He designed it as the ultimate test of your character.",
+            "visual_description": "Close up of an old quill pen writing furiously on parchment, ink splashing, text glowing gold.",
+            "duration": "7"
+        },
+        {
+            "scene_number": 7,
+            "text": "If the thought scares you, you need to change your path. The goal is to become the Superman\u2014someone who loves life so much they would crave the infinite replay.",
+            "visual_description": "A silhouette of a figure standing on top of a mountain peak above the clouds, arms wide open, looking at a massive galaxy sky.",
+            "duration": "9"
+        },
+        {
+            "scene_number": 8,
+            "text": "Don't just survive time, conquer it. Dive deeper into philosophy with our app.",
+            "visual_description": "Text overlay 'AMOR FATI' transforming into the app logo on a clean, modern background.",
+            "duration": "6"
+        }
+    ],
+    "hook": "Friedrich Nietzsche came up with the single most terrifying thought experiment in history.",
+    "app_promotion": "Dive deeper into philosophy with our app.",
+    "title": "nietzsche"
+}

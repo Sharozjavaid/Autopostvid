@@ -1,0 +1,11 @@
+google-genai
+elevenlabs
+moviepy
+fastapi
+uvicorn
+python-multipart
+aiofiles
+requests
+pillow
+python-dotenv
+streamlit

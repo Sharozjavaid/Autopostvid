@@ -1,0 +1,52 @@
+{
+  "story": {
+    "title": "Plato's Cave Allegory",
+    "script": "You sit in darkness, believing shadows on the wall are reality.\n        These dancing forms seem so real, so meaningful.\n        But what if everything you know is just an illusion?\n        This profound question drives Plato's famous Cave Allegory.\n        Imagine being freed from these chains of ignorance.\n        What would you see when you step into the light?\n        True knowledge awaits those brave enough to question reality.\n        Explore deeper philosophical mysteries with our app.",
+    "hook": "You sit in darkness, believing shadows are reality...",
+    "app_promotion": "Explore deeper philosophical mysteries with our app.",
+    "total_duration": 30,
+    "target_audience": "Philosophy learners and TikTok users"
+  },
+  "scenes": [
+    {
+      "scene_number": 1,
+      "text": "You sit in darkness, believing shadows on the wall are reality.",
+      "visual_description": "Dark cave with chained figures watching shadows on wall",
+      "key_concept": "Illusion",
+      "duration": 7
+    },
+    {
+      "scene_number": 2,
+      "text": "But what if everything you know is just an illusion?",
+      "visual_description": "Plato contemplating in classical Greek setting",
+      "key_concept": "Questioning",
+      "duration": 7
+    },
+    {
+      "scene_number": 3,
+      "text": "Imagine being freed from these chains of ignorance.",
+      "visual_description": "Figure breaking free into bright light",
+      "key_concept": "Freedom",
+      "duration": 8
+    },
+    {
+      "scene_number": 4,
+      "text": "True knowledge awaits those brave enough to question reality.",
+      "visual_description": "Wise figure with scroll in temple of wisdom",
+      "key_concept": "Wisdom",
+      "duration": 8
+    }
+  ],
+  "image_paths": [
+    "generated_images/plato_cave_scene_1.png",
+    "generated_images/plato_cave_scene_2.png",
+    "generated_images/plato_cave_scene_3.png",
+    "generated_images/plato_cave_scene_4.png"
+  ],
+  "status": "images_complete",
+  "next_steps": [
+    "Add ElevenLabs API key for voice generation",
+    "Install MoviePy for video assembly",
+    "Generate final TikTok video"
+  ]
+}

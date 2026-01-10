@@ -1,0 +1,54 @@
+{
+    "title": "King Solomon",
+    "script": "Imagine standing in the heavy silence of an ancient throne room. Two desperate mothers kneel before King Solomon, both claiming the same living child. How do you discern the truth when every word could be a lie? The King makes a terrifying decree: \"Cut the child in two.\" The sword rises. One woman accepts this brutal fairness, content with half. But the real mother cries out, \"No! Give him to her!\" In that instant, the mask falls. Solomon knew that true love prefers to lose everything rather than see its beloved destroyed. He wasn't testing their logic; he was testing their hearts. Wisdom is more than knowledge; it is the ability to see the invisible threads of human nature. Are you ready to look beyond the surface? Dive deeper into philosophy with our app.",
+    "scenes": [
+        {
+            "scene_number": 1,
+            "text": "Imagine standing in the heavy silence of an ancient throne room. Two desperate mothers kneel before King Solomon, both claiming the same living child.",
+            "visual_description": "A cinematic wide shot of an ancient stone throne room bathed in shafts of dusty golden light. In the distance, a king sits on a throne while two small, silhouette figures kneel on the floor before him.",
+            "duration": 8
+        },
+        {
+            "scene_number": 2,
+            "text": "How do you discern the truth when every word could be a lie?",
+            "visual_description": "Close up of the two women's faces, side by side. One looks angry, the other tearful. The lighting is dramatic, casting shadows that obscure half their faces to symbolize mystery.",
+            "duration": 6
+        },
+        {
+            "scene_number": 3,
+            "text": "The King makes a terrifying decree: \"Cut the child in two.\" The sword rises.",
+            "visual_description": "A low-angle shot looking up at King Solomon. He is calm and regal, raising a hand. In the foreground, out of focus, a guard begins to draw a gleaming sword.",
+            "duration": 7
+        },
+        {
+            "scene_number": 4,
+            "text": "One woman accepts this brutal fairness, content with half.",
+            "visual_description": "A shot of the false mother. She stands with arms crossed, her expression cold, calculating, and indifferent. The background is dark and muted.",
+            "duration": 5
+        },
+        {
+            "scene_number": 5,
+            "text": "But the real mother cries out, \"No! Give him to her!\"",
+            "visual_description": "The true mother reaching out desperately toward the camera, tears streaming down her face, her hand open in a gesture of surrender and sacrifice.",
+            "duration": 6
+        },
+        {
+            "scene_number": 6,
+            "text": "In that instant, the mask falls. Solomon knew that true love prefers to lose everything rather than see its beloved destroyed.",
+            "visual_description": "An artistic, abstract transition where the guard sheathes the sword and warm light floods the room, illuminating the crying mother while the cold mother fades into shadow.",
+            "duration": 9
+        },
+        {
+            "scene_number": 7,
+            "text": "He wasn't testing their logic; he was testing their hearts. Wisdom is more than knowledge; it is the ability to see the invisible threads of human nature.",
+            "visual_description": "A conceptual image of a glowing golden thread connecting a human heart to a bright light representing the mind. It looks like a classical philosophy painting come to life.",
+            "duration": 10
+        },
+        {
+            "scene_number": 8,
+            "text": "Are you ready to look beyond the surface? Dive deeper into philosophy with our app.",
+            "visual_description": "A modern, clean shot of a hand holding a smartphone displaying the app's elegant logo, with a blurred background of a classical library.",
+            "duration": 7
+        }
+    ]
+}
