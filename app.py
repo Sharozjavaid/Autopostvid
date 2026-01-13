@@ -3306,16 +3306,21 @@ with tab9:
     st.header("📊 Production History")
     st.markdown("View all generated content with full metadata, dates, models, and costs.")
     
-    # Try to import production history
-    try:
-        from production_history import get_production_history, ProductionRecord
-        history = get_production_history()
-        
-        # Stats summary
-        stats = history.get_stats()
-        
-        st.subheader("📈 Overview")
-        col1, col2, col3, col4 = st.columns(4)
+    # Sub-tabs for different views
+    history_tab1, history_tab2 = st.tabs(["📜 Logged Productions", "📁 Browse Slideshows"])
+    
+    # --- Tab 1: Logged Productions ---
+    with history_tab1:
+        # Try to import production history
+        try:
+            from production_history import get_production_history, ProductionRecord
+            history = get_production_history()
+            
+            # Stats summary
+            stats = history.get_stats()
+            
+            st.subheader("📈 Overview")
+            col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             st.metric("Total Productions", stats['total_productions'])
@@ -3475,11 +3480,153 @@ with tab9:
         else:
             st.info("No daily data available yet.")
         
-        # Refresh button
-        if st.button("🔄 Refresh History"):
-            st.rerun()
+            # Refresh button
+            if st.button("🔄 Refresh History"):
+                st.rerun()
+                
+        except ImportError as e:
+            st.warning(f"Production history module not available: {e}")
+            st.info("Run `python3 daily_production.py` to start generating content with history tracking.")
+    
+    # --- Tab 2: Browse All Slideshows ---
+    with history_tab2:
+        st.subheader("📁 Browse Generated Slideshows")
+        st.markdown("View all slideshows in the `generated_slideshows/` directory, including those not logged.")
+        
+        # Scan for slideshows
+        slideshow_base = "generated_slideshows"
+        
+        # Get all subdirectories and organize by folder
+        slideshow_folders = {
+            "gpt15": "GPT Image 1.5 (Best Quality)",
+            "flux": "Flux Schnell (Fast)",
+            "root": "Main Folder"
+        }
+        
+        # Folder selector
+        available_folders = ["All"]
+        if os.path.exists(os.path.join(slideshow_base, "gpt15")):
+            available_folders.append("gpt15")
+        if os.path.exists(os.path.join(slideshow_base, "flux")):
+            available_folders.append("flux")
+        available_folders.append("root")
+        
+        folder_filter = st.selectbox(
+            "Filter by folder",
+            available_folders,
+            key="slideshow_folder_filter"
+        )
+        
+        # Collect all slideshows
+        all_slideshows = {}  # title -> {slides: [], folder: str, script: path}
+        
+        def scan_folder(folder_path, folder_name):
+            """Scan a folder for slideshow slides and group by title."""
+            if not os.path.exists(folder_path):
+                return
             
-    except ImportError as e:
-        st.warning(f"Production history module not available: {e}")
-        st.info("Run `python3 daily_production.py` to start generating content with history tracking.")
+            for filename in os.listdir(folder_path):
+                if filename.endswith('_slide_0.png'):
+                    # Extract title from filename
+                    title = filename.replace('_slide_0.png', '')
+                    
+                    # Find all slides for this title
+                    slides = []
+                    for i in range(20):  # Max 20 slides
+                        slide_path = os.path.join(folder_path, f"{title}_slide_{i}.png")
+                        if os.path.exists(slide_path):
+                            slides.append(slide_path)
+                        else:
+                            break
+                    
+                    # Find script if exists
+                    script_path = os.path.join(folder_path, f"{title}_script.json")
+                    
+                    if slides:
+                        all_slideshows[f"{folder_name}/{title}"] = {
+                            'title': title.replace('_', ' '),
+                            'slides': slides,
+                            'folder': folder_name,
+                            'folder_label': slideshow_folders.get(folder_name, folder_name),
+                            'script_path': script_path if os.path.exists(script_path) else None,
+                            'slide_count': len(slides)
+                        }
+        
+        # Scan folders
+        if folder_filter in ["All", "gpt15"]:
+            scan_folder(os.path.join(slideshow_base, "gpt15"), "gpt15")
+        if folder_filter in ["All", "flux"]:
+            scan_folder(os.path.join(slideshow_base, "flux"), "flux")
+        if folder_filter in ["All", "root"]:
+            scan_folder(slideshow_base, "root")
+        
+        if not all_slideshows:
+            st.info("No slideshows found. Generate some using Tab 8: TikTok Slideshow.")
+        else:
+            st.success(f"Found {len(all_slideshows)} slideshows")
+            
+            # Display slideshows
+            for key, slideshow in sorted(all_slideshows.items(), reverse=True):
+                folder_badge = f"🟢 {slideshow['folder']}" if slideshow['folder'] == 'gpt15' else f"🟡 {slideshow['folder']}"
+                
+                with st.expander(f"🎴 {slideshow['title']} ({slideshow['slide_count']} slides) - {folder_badge}"):
+                    st.markdown(f"**Folder:** {slideshow['folder_label']}")
+                    st.markdown(f"**Slides:** {slideshow['slide_count']}")
+                    
+                    # Show script info if available
+                    if slideshow['script_path']:
+                        try:
+                            with open(slideshow['script_path'], 'r') as f:
+                                script_data = json.load(f)
+                            st.markdown(f"**Topic:** {script_data.get('topic', 'N/A')}")
+                            if 'slides' in script_data:
+                                st.markdown(f"**Script slides:** {len(script_data['slides'])}")
+                        except:
+                            pass
+                    
+                    # Show all slides
+                    st.markdown("**Slides:**")
+                    
+                    # Show slides in a grid (3 columns)
+                    cols_per_row = 3
+                    for row_start in range(0, len(slideshow['slides']), cols_per_row):
+                        cols = st.columns(cols_per_row)
+                        for col_idx, slide_idx in enumerate(range(row_start, min(row_start + cols_per_row, len(slideshow['slides'])))):
+                            slide_path = slideshow['slides'][slide_idx]
+                            with cols[col_idx]:
+                                try:
+                                    img = Image.open(slide_path)
+                                    st.image(img, caption=f"Slide {slide_idx}", use_container_width=True)
+                                except Exception as e:
+                                    st.error(f"Error loading slide {slide_idx}: {e}")
+                    
+                    # Show backgrounds if they exist
+                    bg_folder = os.path.join(os.path.dirname(slideshow['slides'][0]), "backgrounds")
+                    if not os.path.exists(bg_folder):
+                        bg_folder = os.path.join(slideshow_base, "backgrounds")
+                    
+                    title_prefix = slideshow['title'].replace(' ', '_')
+                    bg_files = []
+                    if os.path.exists(bg_folder):
+                        for f in os.listdir(bg_folder):
+                            if f.startswith(title_prefix) and f.endswith('.png'):
+                                bg_files.append(os.path.join(bg_folder, f))
+                    
+                    if bg_files:
+                        with st.expander(f"🎨 View Backgrounds ({len(bg_files)})"):
+                            bg_cols_per_row = 4
+                            for row_start in range(0, len(bg_files), bg_cols_per_row):
+                                cols = st.columns(bg_cols_per_row)
+                                for col_idx, bg_idx in enumerate(range(row_start, min(row_start + bg_cols_per_row, len(bg_files)))):
+                                    bg_path = bg_files[bg_idx]
+                                    with cols[col_idx]:
+                                        try:
+                                            img = Image.open(bg_path)
+                                            st.image(img, caption=os.path.basename(bg_path), use_container_width=True)
+                                        except:
+                                            pass
+        
+        # Refresh button
+        if st.button("🔄 Refresh Slideshows", key="refresh_slideshows"):
+            st.rerun()
 
