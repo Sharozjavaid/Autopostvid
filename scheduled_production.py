@@ -64,6 +64,11 @@ SCHEDULE = {
         "hour": 22,
         "minute": 30,
         "description": "Test Set (10:30 PM)"
+    },
+    "11pm": {
+        "hour": 23,
+        "minute": 0,
+        "description": "Night Test Set (11:00 PM)"
     }
 }
 
@@ -240,7 +245,7 @@ def main():
     parser.add_argument(
         "--run",
         type=str,
-        choices=["9am", "1pm", "5pm", "1030pm"],
+        choices=["9am", "1pm", "5pm", "1030pm", "11pm"],
         help="Run specific time slot content now"
     )
     
