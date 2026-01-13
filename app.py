@@ -3321,165 +3321,165 @@ with tab9:
             
             st.subheader("📈 Overview")
             col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Total Productions", stats['total_productions'])
-        with col2:
-            st.metric("Total Slides", stats['total_slides'])
-        with col3:
-            st.metric("Emailed", stats['emailed_count'])
-        with col4:
-            st.metric("Total Cost", f"${stats['total_cost']:.2f}")
-        
-        # Breakdown by type
-        st.subheader("📊 By Content Type")
-        type_cols = st.columns(3)
-        type_icons = {
-            'slideshow': '🎴',
-            'narration': '🎙️',
-            'video_transitions': '🎬'
-        }
-        
-        for i, (content_type, count) in enumerate(stats.get('by_type', {}).items()):
-            with type_cols[i % 3]:
-                icon = type_icons.get(content_type, '📁')
-                st.metric(f"{icon} {content_type.replace('_', ' ').title()}", count)
-        
-        # Cost tracking
-        try:
-            from daily_production import cost_tracker
             
-            st.subheader("💰 Cost Tracking")
-            today_total, today_by_cat = cost_tracker.get_today_costs()
-            month_total, month_by_cat = cost_tracker.get_month_costs()
+            with col1:
+                st.metric("Total Productions", stats['total_productions'])
+            with col2:
+                st.metric("Total Slides", stats['total_slides'])
+            with col3:
+                st.metric("Emailed", stats['emailed_count'])
+            with col4:
+                st.metric("Total Cost", f"${stats['total_cost']:.2f}")
             
-            cost_col1, cost_col2 = st.columns(2)
-            with cost_col1:
-                st.markdown("**Today's Costs**")
-                st.metric("Total", f"${today_total:.2f}")
-                for cat, cost in today_by_cat.items():
-                    st.caption(f"  {cat}: ${cost:.2f}")
+            # Breakdown by type
+            st.subheader("📊 By Content Type")
+            type_cols = st.columns(3)
+            type_icons = {
+                'slideshow': '🎴',
+                'narration': '🎙️',
+                'video_transitions': '🎬'
+            }
             
-            with cost_col2:
-                st.markdown("**This Month's Costs**")
-                st.metric("Total", f"${month_total:.2f}")
-                for cat, cost in month_by_cat.items():
-                    st.caption(f"  {cat}: ${cost:.2f}")
-        except Exception as e:
-            st.caption(f"Cost tracking not available: {e}")
-        
-        st.divider()
-        
-        # Recent productions
-        st.subheader("📜 Recent Productions")
-        
-        # Filter options
-        filter_col1, filter_col2 = st.columns(2)
-        with filter_col1:
-            type_filter = st.selectbox(
-                "Filter by type",
-                ["All", "slideshow", "narration", "video_transitions"],
-                key="history_type_filter"
-            )
-        with filter_col2:
-            model_filter = st.selectbox(
-                "Filter by model",
-                ["All"] + list(stats.get('by_model', {}).keys()),
-                key="history_model_filter"
-            )
-        
-        # Get records
-        records = history.get_all()
-        
-        # Apply filters
-        if type_filter != "All":
-            records = [r for r in records if r.content_type == type_filter]
-        if model_filter != "All":
-            records = [r for r in records if r.image_model == model_filter]
-        
-        if not records:
-            st.info("No productions found. Run `python3 daily_production.py` to generate content.")
-        else:
-            for record in records[:50]:  # Limit to 50 most recent
-                # Determine icon
-                icon = type_icons.get(record.content_type, '📁')
-                status_icon = "✅" if record.status == "completed" else "📧" if record.emailed else "⏳"
+            for i, (content_type, count) in enumerate(stats.get('by_type', {}).items()):
+                with type_cols[i % 3]:
+                    icon = type_icons.get(content_type, '📁')
+                    st.metric(f"{icon} {content_type.replace('_', ' ').title()}", count)
+            
+            # Cost tracking
+            try:
+                from daily_production import cost_tracker
                 
-                with st.expander(f"{icon} {record.title} - {record.date} {status_icon}"):
-                    # Main info
-                    info_col1, info_col2 = st.columns(2)
-                    
-                    with info_col1:
-                        st.markdown(f"**Topic:** {record.topic}")
-                        st.markdown(f"**Type:** {record.content_type.replace('_', ' ').title()}")
-                        st.markdown(f"**Date:** {record.timestamp[:19]}")
-                        st.markdown(f"**Slides:** {record.slides_count}")
-                    
-                    with info_col2:
-                        st.markdown(f"**Model:** `{record.image_model}`")
-                        st.markdown(f"**Font:** {record.font_name}")
-                        st.markdown(f"**Style:** {record.visual_style}")
-                        st.markdown(f"**Cost:** ${record.estimated_cost:.2f}")
-                    
-                    # Pipeline config
-                    st.markdown("**Pipeline Configuration:**")
-                    pipeline_parts = []
-                    pipeline_parts.append(f"🎨 {record.image_model}")
-                    if record.has_voice:
-                        pipeline_parts.append("🎙️ Voice")
-                    if record.has_video_transitions:
-                        pipeline_parts.append("🎬 Video Transitions")
-                    pipeline_parts.append(f"📝 {record.font_name} font")
-                    st.code(" → ".join(pipeline_parts))
-                    
-                    # Status
-                    if record.emailed:
-                        st.success(f"📧 Emailed at: {record.email_sent_at}")
-                    
-                    # Output files
-                    if record.output_files:
-                        st.markdown(f"**Output Files:** {len(record.output_files)} files")
-                        with st.container():
-                            # Show preview of first few images
-                            preview_files = [f for f in record.output_files if f.endswith('.png')][:4]
-                            if preview_files:
-                                preview_cols = st.columns(len(preview_files))
-                                for i, path in enumerate(preview_files):
-                                    with preview_cols[i]:
-                                        if os.path.exists(path):
-                                            try:
-                                                img = Image.open(path)
-                                                st.image(img, use_container_width=True)
-                                            except:
-                                                st.caption(os.path.basename(path))
-                    
-                    # Video preview
-                    if record.video_path and os.path.exists(record.video_path):
-                        st.markdown("**Video:**")
-                        st.video(record.video_path)
-        
-        st.divider()
-        
-        # Daily breakdown
-        st.subheader("📅 Daily Breakdown")
-        by_date = stats.get('by_date', {})
-        if by_date:
-            # Create a simple table
-            date_data = []
-            for date, info in sorted(by_date.items(), reverse=True)[:14]:  # Last 14 days
-                date_data.append({
-                    'Date': date,
-                    'Productions': info['count'],
-                    'Cost': f"${info['cost']:.2f}"
-                })
+                st.subheader("💰 Cost Tracking")
+                today_total, today_by_cat = cost_tracker.get_today_costs()
+                month_total, month_by_cat = cost_tracker.get_month_costs()
+                
+                cost_col1, cost_col2 = st.columns(2)
+                with cost_col1:
+                    st.markdown("**Today's Costs**")
+                    st.metric("Total", f"${today_total:.2f}")
+                    for cat, cost in today_by_cat.items():
+                        st.caption(f"  {cat}: ${cost:.2f}")
+                
+                with cost_col2:
+                    st.markdown("**This Month's Costs**")
+                    st.metric("Total", f"${month_total:.2f}")
+                    for cat, cost in month_by_cat.items():
+                        st.caption(f"  {cat}: ${cost:.2f}")
+            except Exception as e:
+                st.caption(f"Cost tracking not available: {e}")
             
-            if date_data:
-                import pandas as pd
-                df = pd.DataFrame(date_data)
-                st.dataframe(df, use_container_width=True, hide_index=True)
-        else:
-            st.info("No daily data available yet.")
-        
+            st.divider()
+            
+            # Recent productions
+            st.subheader("📜 Recent Productions")
+            
+            # Filter options
+            filter_col1, filter_col2 = st.columns(2)
+            with filter_col1:
+                type_filter = st.selectbox(
+                    "Filter by type",
+                    ["All", "slideshow", "narration", "video_transitions"],
+                    key="history_type_filter"
+                )
+            with filter_col2:
+                model_filter = st.selectbox(
+                    "Filter by model",
+                    ["All"] + list(stats.get('by_model', {}).keys()),
+                    key="history_model_filter"
+                )
+            
+            # Get records
+            records = history.get_all()
+            
+            # Apply filters
+            if type_filter != "All":
+                records = [r for r in records if r.content_type == type_filter]
+            if model_filter != "All":
+                records = [r for r in records if r.image_model == model_filter]
+            
+            if not records:
+                st.info("No productions found. Run `python3 daily_production.py` to generate content.")
+            else:
+                for record in records[:50]:  # Limit to 50 most recent
+                    # Determine icon
+                    icon = type_icons.get(record.content_type, '📁')
+                    status_icon = "✅" if record.status == "completed" else "📧" if record.emailed else "⏳"
+                    
+                    with st.expander(f"{icon} {record.title} - {record.date} {status_icon}"):
+                        # Main info
+                        info_col1, info_col2 = st.columns(2)
+                        
+                        with info_col1:
+                            st.markdown(f"**Topic:** {record.topic}")
+                            st.markdown(f"**Type:** {record.content_type.replace('_', ' ').title()}")
+                            st.markdown(f"**Date:** {record.timestamp[:19]}")
+                            st.markdown(f"**Slides:** {record.slides_count}")
+                        
+                        with info_col2:
+                            st.markdown(f"**Model:** `{record.image_model}`")
+                            st.markdown(f"**Font:** {record.font_name}")
+                            st.markdown(f"**Style:** {record.visual_style}")
+                            st.markdown(f"**Cost:** ${record.estimated_cost:.2f}")
+                        
+                        # Pipeline config
+                        st.markdown("**Pipeline Configuration:**")
+                        pipeline_parts = []
+                        pipeline_parts.append(f"🎨 {record.image_model}")
+                        if record.has_voice:
+                            pipeline_parts.append("🎙️ Voice")
+                        if record.has_video_transitions:
+                            pipeline_parts.append("🎬 Video Transitions")
+                        pipeline_parts.append(f"📝 {record.font_name} font")
+                        st.code(" → ".join(pipeline_parts))
+                        
+                        # Status
+                        if record.emailed:
+                            st.success(f"📧 Emailed at: {record.email_sent_at}")
+                        
+                        # Output files
+                        if record.output_files:
+                            st.markdown(f"**Output Files:** {len(record.output_files)} files")
+                            with st.container():
+                                # Show preview of first few images
+                                preview_files = [f for f in record.output_files if f.endswith('.png')][:4]
+                                if preview_files:
+                                    preview_cols = st.columns(len(preview_files))
+                                    for i, path in enumerate(preview_files):
+                                        with preview_cols[i]:
+                                            if os.path.exists(path):
+                                                try:
+                                                    img = Image.open(path)
+                                                    st.image(img, use_container_width=True)
+                                                except:
+                                                    st.caption(os.path.basename(path))
+                        
+                        # Video preview
+                        if record.video_path and os.path.exists(record.video_path):
+                            st.markdown("**Video:**")
+                            st.video(record.video_path)
+            
+            st.divider()
+            
+            # Daily breakdown
+            st.subheader("📅 Daily Breakdown")
+            by_date = stats.get('by_date', {})
+            if by_date:
+                # Create a simple table
+                date_data = []
+                for date, info in sorted(by_date.items(), reverse=True)[:14]:  # Last 14 days
+                    date_data.append({
+                        'Date': date,
+                        'Productions': info['count'],
+                        'Cost': f"${info['cost']:.2f}"
+                    })
+                
+                if date_data:
+                    import pandas as pd
+                    df = pd.DataFrame(date_data)
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+            else:
+                st.info("No daily data available yet.")
+            
             # Refresh button
             if st.button("🔄 Refresh History"):
                 st.rerun()
