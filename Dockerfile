@@ -4,6 +4,8 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     imagemagick \
+    supervisor \
+    cron \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -19,10 +21,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p generated_scripts generated_images generated_audio generated_videos
+RUN mkdir -p generated_scripts generated_images generated_audio generated_videos generated_slideshows/gpt15 generated_videos/transitions generated_videos/clips
 
-# Expose port for Streamlit (optional, if you want to access the UI)
+# Copy supervisor config
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Set up cron job for daily production (8 AM PST = 4 PM UTC)
+# Note: Uncomment to enable scheduled production
+# RUN echo "0 16 * * * cd /app && python3 daily_production.py >> /var/log/daily-production.log 2>&1" | crontab -
+
+# Expose port for Streamlit
 EXPOSE 8501
 
-# Default command: run the automation agent
-CMD ["python3", "auto_runner.py", "--smart"]
+# Run both services via supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

@@ -15,8 +15,8 @@ class EmailSender:
         # Default recipient to sender if not specified
         self.default_recipient = os.getenv("RECIPIENT_EMAIL") or self.sender_email
 
-    def send_video(self, video_path: str, recipient: str = None, subject: str = None, body: str = None):
-        """Send an email with the generated video attachment"""
+    def send_video(self, video_path: str, recipient: str = None, subject: str = None, body: str = None, caption: str = None):
+        """Send an email with the generated video attachment and optional TikTok caption"""
         
         if not self.sender_email or not self.password:
             print("❌ Error: EMAIL_USER or EMAIL_PASSWORD not set in .env")
@@ -31,6 +31,15 @@ class EmailSender:
         msg['Subject'] = subject or "Your Generated Philosophy Video is Ready 🎥"
 
         body_text = body or "Here is your fresh philosophy video! Enjoy.\n\nAutomated by your Agent."
+        
+        # Add TikTok caption section if provided
+        if caption:
+            body_text += "\n\n" + "=" * 50
+            body_text += "\n📱 TIKTOK CAPTION (Copy & Paste):\n"
+            body_text += "=" * 50
+            body_text += f"\n\n{caption}\n"
+            body_text += "\n" + "=" * 50
+        
         msg.attach(MIMEText(body_text, 'plain'))
 
         # Attach Video

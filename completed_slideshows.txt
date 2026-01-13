@@ -1,0 +1,4 @@
+2026-01-12T19:22:37.019094 - flux - Occam's Razor Viral
+2026-01-12T19:23:39.280524 - flux - Stoicism 101
+2026-01-12T19:25:40.464069 - gpt15 - Stoicism in 60 Seconds
+2026-01-12T21:27:42.861306 - gpt15 - 5 Stoic Philosophers Every Man Should Know

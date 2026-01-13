@@ -43,8 +43,8 @@ echo ""
 read -p "Enter your personal project ID (or press Enter to create new): " PROJECT_ID
 
 if [ -z "$PROJECT_ID" ]; then
-    # Create new project
-    DEFAULT_PROJECT="philosophy-video-bot-$(date +%s)"
+    # Create new project (max 30 chars, must start with letter)
+    DEFAULT_PROJECT="philosophy-bot-$(date +%s | tail -c 6)"
     read -p "Create new project? Enter name [$DEFAULT_PROJECT]: " NEW_PROJECT
     PROJECT_ID=${NEW_PROJECT:-$DEFAULT_PROJECT}
     

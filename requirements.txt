@@ -1,6 +1,7 @@
 google-genai
+openai
 elevenlabs
-moviepy
+moviepy==1.0.3
 fastapi
 uvicorn
 python-multipart
@@ -9,3 +10,9 @@ requests
 pillow
 python-dotenv
 streamlit
+pytz
+fal-client
+
+# Marketing Agent Chat Interface
+anthropic>=0.39.0
+flask>=3.0.0

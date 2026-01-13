@@ -1,0 +1,37 @@
+# ===========================================
+# NARRATION TOPICS - Story-style content that benefits from voiceover
+# ===========================================
+# These are narrative stories, not list-based - need voice narration
+# ===========================================
+
+# --- CLASSIC PHILOSOPHY STORIES ---
+The Death of Socrates
+Marcus Aurelius and the Slave Who Spilled Oil
+How Diogenes Humiliated Alexander the Great
+The Day Seneca Was Sentenced to Death
+Zeno's Shipwreck That Started Stoicism
+Epictetus: From Slave to Philosopher
+
+# --- PHILOSOPHICAL MOMENTS IN HISTORY ---
+The Trial That Changed Philosophy Forever
+When a Roman Emperor Wrote a Diary No One Was Meant to Read
+The Philosopher Who Lived in a Barrel
+The Last Night of Seneca's Life
+How a Slave Taught Emperors
+
+# --- THOUGHT EXPERIMENTS AS STORIES ---
+The Allegory of the Cave: Plato's Mind-Bending Story
+The Ship of Theseus: A Story of Identity
+The Ring of Gyges: Would You Be Good If No One Was Watching?
+Buridan's Donkey: The Paralysis of Indecision
+
+# --- ANCIENT WISDOM NARRATIVES ---
+What Marcus Aurelius Wrote Before Battle
+Seneca's Letter to a Friend in Crisis
+The Morning Routine of Roman Emperors
+How Stoics Prepared for Death
+
+# --- MODERN APPLICATIONS (NARRATIVE) ---
+How Stoicism Saved a Vietnam POW
+The Philosopher Billionaires Quote Daily
+What Tim Ferriss Learned from Seneca

@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marketing Agent - Philosophy Video Generator</title>
+    <style>
+        :root {
+            --bg-dark: #0f0f0f;
+            --bg-card: #1a1a1a;
+            --bg-hover: #252525;
+            --border: #333;
+            --text-primary: #fff;
+            --text-secondary: #888;
+            --text-muted: #555;
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .app-container {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            grid-template-rows: 60px 1fr;
+            height: 100vh;
+            gap: 1px;
+            background: var(--border);
+        }
+        
+        /* Header */
+        .header {
+            grid-column: 1 / -1;
+            background: var(--bg-card);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+        
+        .header h1 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .header-btn {
+            background: var(--bg-hover);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        
+        .header-btn:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+        
+        .status {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        
+        .status.processing {
+            color: var(--warning);
+        }
+        
+        /* Chat Panel */
+        .chat-panel {
+            background: var(--bg-card);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.6;
+            font-size: 0.95rem;
+            white-space: pre-wrap;
+        }
+        
+        .message.user {
+            align-self: flex-end;
+            background: var(--accent);
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.assistant {
+            align-self: flex-start;
+            background: var(--bg-hover);
+            border-bottom-left-radius: 4px;
+        }
+        
+        .message.error {
+            background: var(--error);
+            color: white;
+        }
+        
+        .chat-input-container {
+            padding: 16px;
+            background: var(--bg-dark);
+            border-top: 1px solid var(--border);
+        }
+        
+        .chat-input-wrapper {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-input {
+            flex: 1;
+            background: var(--bg-hover);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            resize: none;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        
+        .chat-input:focus {
+            border-color: var(--accent);
+        }
+        
+        .chat-input::placeholder {
+            color: var(--text-muted);
+        }
+        
+        .send-btn {
+            background: var(--accent);
+            border: none;
+            border-radius: 8px;
+            padding: 0 24px;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .send-btn:hover {
+            background: var(--accent-hover);
+        }
+        
+        .send-btn:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+        }
+        
+        /* Preview Panel */
+        .preview-panel {
+            background: var(--bg-card);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .preview-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .preview-header h3 {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+        
+        .preview-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow: hidden;
+        }
+        
+        .preview-placeholder {
+            text-align: center;
+            color: var(--text-muted);
+        }
+        
+        .preview-placeholder .icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+        
+        .preview-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        
+        .slide-nav {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .slide-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--bg-hover);
+            border: 2px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .slide-dot:hover {
+            background: var(--text-muted);
+        }
+        
+        .slide-dot.active {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+        
+        .slide-dot.generated {
+            background: var(--success);
+            border-color: var(--success);
+        }
+        
+        /* Font selector */
+        .font-selector {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
+            background: var(--bg-dark);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .font-btn {
+            background: var(--bg-hover);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+        
+        .font-btn:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+        
+        .font-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 900px) {
+            .app-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 50px 1fr 350px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🎬 Marketing Agent</h1>
+            <div class="header-actions">
+                <span class="status" id="status">Ready</span>
+                <button class="header-btn" onclick="clearChat()">Clear Chat</button>
+            </div>
+        </header>
+        
+        <!-- Chat Panel -->
+        <div class="chat-panel">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message assistant">
+Hello! I'm your Marketing Agent. I can help you create viral TikTok philosophy slideshows.
+
+Try saying something like:
+• "Make a script about 5 stoic philosophers"
+• "Generate the first slide"
+• "Review the slide quality"
+• "Try the Cinzel font"
+                </div>
+            </div>
+            <div class="chat-input-container">
+                <div class="chat-input-wrapper">
+                    <textarea 
+                        class="chat-input" 
+                        id="chatInput" 
+                        placeholder="Type your message..." 
+                        rows="1"
+                        onkeydown="handleKeyDown(event)"
+                    ></textarea>
+                    <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Preview Panel -->
+        <div class="preview-panel">
+            <div class="preview-header">
+                <h3>Preview</h3>
+                <span id="previewLabel">No slides yet</span>
+            </div>
+            <div class="preview-content" id="previewContent">
+                <div class="preview-placeholder">
+                    <div class="icon">🖼️</div>
+                    <div>Generated images will appear here</div>
+                </div>
+            </div>
+            <div class="slide-nav" id="slideNav"></div>
+            <div class="font-selector" id="fontSelector">
+                <button class="font-btn" data-font="bebas">Bebas</button>
+                <button class="font-btn" data-font="cinzel">Cinzel</button>
+                <button class="font-btn" data-font="cormorant">Cormorant</button>
+                <button class="font-btn" data-font="montserrat">Montserrat</button>
+                <button class="font-btn" data-font="oswald">Oswald</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let isProcessing = false;
+        let currentSlideIndex = 0;
+        let project = null;
+        let imagePaths = [];
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setupFontButtons();
+            loadProject();
+        });
+        
+        // Load existing project
+        async function loadProject() {
+            try {
+                const response = await fetch('/api/project');
+                const data = await response.json();
+                if (data.success && data.project) {
+                    project = data.project;
+                    imagePaths = (project.image_paths || []).filter(p => p);
+                    updateSlideNav();
+                    if (imagePaths.length > 0) {
+                        showSlide(0);
+                    }
+                }
+            } catch (e) {
+                console.log('No existing project');
+            }
+        }
+        
+        // Send message
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message || isProcessing) return;
+            
+            // Add user message
+            addMessage('user', message);
+            input.value = '';
+            
+            // Set processing state
+            isProcessing = true;
+            document.getElementById('sendBtn').disabled = true;
+            document.getElementById('status').textContent = 'Processing...';
+            document.getElementById('status').className = 'status processing';
+            
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addMessage('assistant', data.response);
+                    
+                    // Update project state
+                    if (data.project) {
+                        project = data.project;
+                    }
+                    if (data.image_paths) {
+                        imagePaths = data.image_paths;
+                        updateSlideNav();
+                        
+                        // Show latest slide
+                        if (imagePaths.length > 0) {
+                            showSlide(imagePaths.length - 1);
+                        }
+                    }
+                } else {
+                    addMessage('error', 'Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (e) {
+                addMessage('error', 'Error: ' + e.message);
+            }
+            
+            // Reset state
+            isProcessing = false;
+            document.getElementById('sendBtn').disabled = false;
+            document.getElementById('status').textContent = 'Ready';
+            document.getElementById('status').className = 'status';
+        }
+        
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+        
+        // Chat UI
+        function addMessage(role, content) {
+            const container = document.getElementById('chatMessages');
+            const msg = document.createElement('div');
+            msg.className = `message ${role}`;
+            msg.textContent = content;
+            container.appendChild(msg);
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        async function clearChat() {
+            document.getElementById('chatMessages').innerHTML = `
+                <div class="message assistant">Chat cleared. How can I help you?</div>
+            `;
+            await fetch('/api/memory/clear', { method: 'POST' });
+        }
+        
+        // Preview
+        function showSlide(index) {
+            if (index >= imagePaths.length) return;
+            
+            currentSlideIndex = index;
+            const path = imagePaths[index];
+            const filename = path.split('/').pop();
+            const url = `/generated/${filename}?t=${Date.now()}`;
+            
+            document.getElementById('previewContent').innerHTML = 
+                `<img class="preview-image" src="${url}" alt="Slide ${index}">`;
+            document.getElementById('previewLabel').textContent = `Slide ${index + 1} of ${imagePaths.length}`;
+            
+            updateSlideNav();
+        }
+        
+        function updateSlideNav() {
+            const nav = document.getElementById('slideNav');
+            
+            if (imagePaths.length === 0) {
+                nav.innerHTML = '';
+                return;
+            }
+            
+            nav.innerHTML = imagePaths.map((path, i) => {
+                const isActive = i === currentSlideIndex;
+                return `<div class="slide-dot ${isActive ? 'active' : 'generated'}" 
+                             onclick="showSlide(${i})" 
+                             title="Slide ${i + 1}"></div>`;
+            }).join('');
+        }
+        
+        // Font selection
+        function setupFontButtons() {
+            document.querySelectorAll('.font-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    if (imagePaths.length === 0) {
+                        addMessage('assistant', 'Generate some slides first, then you can change fonts.');
+                        return;
+                    }
+                    
+                    const font = btn.dataset.font;
+                    
+                    // Update active state
+                    document.querySelectorAll('.font-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    // Regenerate current slide
+                    document.getElementById('status').textContent = `Changing font...`;
+                    document.getElementById('status').className = 'status processing';
+                    
+                    try {
+                        const response = await fetch('/api/regenerate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                slide_index: currentSlideIndex,
+                                font_name: font
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success && result.image_path) {
+                            imagePaths[currentSlideIndex] = result.image_path;
+                            showSlide(currentSlideIndex);
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    }
+                    
+                    document.getElementById('status').textContent = 'Ready';
+                    document.getElementById('status').className = 'status';
+                });
+            });
+        }
+    </script>
+</body>
+</html>

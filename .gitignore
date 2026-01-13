@@ -1,0 +1,40 @@
+# Environment variables - NEVER commit these
+.env
+.env.local
+.env.production
+.env.*
+
+# API keys and secrets
+*.key
+secrets/
+
+# Generated content
+generated_images/
+generated_audio/
+generated_videos/
+generated_scripts/
+generated_slideshows/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# Logs
+*.log
+automation.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
