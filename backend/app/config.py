@@ -29,22 +29,26 @@ CLAUDE_MAX_ITERATIONS = 25
 # ENVIRONMENT DETECTION
 # =============================================================================
 def is_production() -> bool:
-    """Detect if running in production (GCP VM) vs local development."""
-    # Check for explicit environment variable first
+    """Detect if running in production (GCP VM/Docker) vs local development."""
+    # Check for explicit environment variable first (set by Docker)
     env = os.environ.get("ENVIRONMENT", "").lower()
     if env in ("production", "prod"):
         return True
     if env in ("development", "dev", "local"):
         return False
     
-    # Auto-detect: Check if running on GCP VM
-    # The VM has the code at /home/runner/philosophy_video_generator
-    gcp_path = Path("/home/runner/philosophy_video_generator")
-    if gcp_path.exists():
+    # Check for GCS credentials (indicates production)
+    if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
         return True
     
-    # Check for GCS credentials file (production has it)
-    if Path("/home/runner/philosophy_video_generator/gcs-credentials.json").exists():
+    # Check for Docker environment (running inside container)
+    docker_app = Path("/app")
+    if docker_app.exists() and (docker_app / "backend").exists():
+        return True
+    
+    # Auto-detect: Check if running on GCP VM directly
+    gcp_path = Path("/home/runner/philosophy_video_generator")
+    if gcp_path.exists():
         return True
     
     # Default to development

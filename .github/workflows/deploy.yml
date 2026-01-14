@@ -81,6 +81,14 @@ jobs:
             rm ~/project.tar.gz
           "
 
+      - name: Setup GCS credentials on VM
+        run: |
+          gcloud compute ssh ${{ env.VM_NAME }} --zone=${{ env.ZONE }} --command="
+            cat > ~/philosophy_video_generator/gcs-credentials.json << 'EOF'
+          ${{ secrets.GCS_SERVICE_ACCOUNT_KEY }}
+          EOF
+          "
+
       - name: Build and run new container
         run: |
           gcloud compute ssh ${{ env.VM_NAME }} --zone=${{ env.ZONE }} --command="
@@ -90,6 +98,9 @@ jobs:
               -p 8501:8501 \
               -p 8001:8001 \
               --env-file .env \
+              -v ~/philosophy_video_generator/gcs-credentials.json:/app/gcs-credentials.json:ro \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcs-credentials.json \
+              -e ENVIRONMENT=production \
               --restart unless-stopped \
               ${{ env.IMAGE_NAME }}
           "
