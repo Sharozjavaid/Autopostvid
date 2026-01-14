@@ -131,10 +131,10 @@ class TikTokCLI:
         
         csrf_state = secrets.token_urlsafe(16)
         
-        # Scopes needed for inbox/draft uploads
+        # Scopes needed for uploads
         # video.upload = upload to inbox (drafts)
-        # video.publish = direct publish (requires review for sandbox)
-        scopes = "user.info.basic,video.upload"
+        # video.publish = direct publish + photo posts
+        scopes = "user.info.basic,video.upload,video.publish"
         
         params = {
             "client_key": self.client_key,
@@ -396,6 +396,95 @@ class TikTokCLI:
         else:
             print(f"❌ Upload failed: {upload_response.text}")
     
+    def cmd_slideshow(self, image_paths, title=None, auto_music=True):
+        """Upload photo slideshow (carousel) to TikTok."""
+        tokens = self.load_tokens()
+        access_token = tokens.get("access_token")
+        
+        if not access_token:
+            print("❌ No access token found. Complete OAuth flow first.")
+            sys.exit(1)
+        
+        # Validate images exist
+        valid_images = []
+        for img_path in image_paths:
+            p = Path(img_path)
+            if p.exists():
+                valid_images.append(str(p.absolute()))
+            else:
+                print(f"⚠️  Image not found: {img_path}")
+        
+        if not valid_images:
+            print("❌ No valid images found!")
+            sys.exit(1)
+        
+        if len(valid_images) > 35:
+            print("⚠️  TikTok allows max 35 images. Using first 35.")
+            valid_images = valid_images[:35]
+        
+        print("\n" + "=" * 60)
+        print("📸 TikTok Photo Slideshow Upload")
+        print("=" * 60)
+        print(f"📁 Images: {len(valid_images)} photos")
+        for i, img in enumerate(valid_images):
+            print(f"   {i+1}. {Path(img).name}")
+        print(f"📝 Caption: {title or '(none)'}")
+        print(f"🎵 Auto-add music: {'Yes' if auto_music else 'No'}")
+        
+        # For photo slideshows, we need to use PULL_FROM_URL
+        # First, we need to upload images to a public URL or use direct upload
+        # TikTok's photo API uses URL pulling, so images need to be publicly accessible
+        
+        # Alternative: Use the content/init endpoint for photos
+        content_init_url = "https://open.tiktokapis.com/v2/post/publish/content/init/"
+        
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json; charset=UTF-8"
+        }
+        
+        # For now, we'll need publicly accessible URLs
+        # Let's check if we can use file upload instead
+        print("\n⚠️  Note: TikTok photo slideshows require publicly accessible image URLs.")
+        print("   For local images, use the --video option to create a video slideshow instead.")
+        print("\n   To use photo slideshow, host your images and provide URLs:")
+        print("   python tiktok_cli.py slideshow --urls 'https://...1.jpg,https://...2.jpg' --title 'Caption'")
+        
+        # If URLs are provided (not local files), proceed
+        if valid_images[0].startswith('http'):
+            init_data = {
+                "post_info": {
+                    "title": title or "",
+                    "privacy_level": "SELF_ONLY",
+                    "disable_comment": False,
+                    "auto_add_music": auto_music
+                },
+                "source_info": {
+                    "source": "PULL_FROM_URL",
+                    "photo_cover_index": 0,
+                    "photo_images": valid_images
+                },
+                "post_mode": "DIRECT_POST",
+                "media_type": "PHOTO"
+            }
+            
+            print("\n📡 Initializing photo slideshow upload...")
+            response = requests.post(content_init_url, headers=headers, json=init_data)
+            
+            print(f"   Status: {response.status_code}")
+            result = response.json()
+            print(f"   Response: {json.dumps(result, indent=2)}")
+            
+            if response.status_code == 200 and result.get("error", {}).get("code") == "ok":
+                publish_id = result.get("data", {}).get("publish_id")
+                print(f"\n✅ Photo slideshow submitted!")
+                print(f"   Publish ID: {publish_id}")
+            else:
+                print(f"\n❌ Upload failed: {result}")
+        else:
+            print("\n💡 Tip: Use video mode for local images:")
+            print(f'   python tiktok_cli.py upload --video "your_video.mp4" --title "{title}"')
+
     def cmd_status(self, publish_id):
         """Check the status of an upload."""
         tokens = self.load_tokens()

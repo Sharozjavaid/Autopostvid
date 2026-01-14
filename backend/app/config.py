@@ -28,20 +28,24 @@ class Settings(BaseSettings):
     generated_videos_dir: Path = base_dir / "generated_videos"
     generated_slides_dir: Path = base_dir / "generated_slides"
 
-    # CORS - allow localhost for dev and production IP
+    # CORS - allow localhost for dev, Vercel for production
     cors_origins: list[str] = [
+        # Local development
         "http://localhost:3000",
         "http://localhost:3001",
-        "http://localhost:3002",
         "http://localhost:5173",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
-        "http://127.0.0.1:3002",
         "http://127.0.0.1:5173",
+        # Production - Vercel
+        "https://app.cofndrly.com",
+        "https://frontend-lyart-ten-67.vercel.app",
+        "https://*.vercel.app",
+        # GCP VM direct
         "http://23.251.149.244:8501",
         "http://23.251.149.244:8001",
         "http://23.251.149.244",
-        "*",  # Allow all origins in production (can restrict later)
+        "*",  # Allow all origins for now (can restrict later)
     ]
 
     class Config:

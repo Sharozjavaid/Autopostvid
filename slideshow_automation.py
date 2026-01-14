@@ -73,7 +73,9 @@ def generate_slideshow(
     font_name: str = "social",
     visual_style: str = "modern",
     output_dir: str = None,
-    auto_id: str = None
+    auto_id: str = None,
+    theme: str = "auto",
+    auto_theme: bool = True
 ) -> Dict:
     """
     Generate a complete slideshow from a topic.
@@ -85,14 +87,23 @@ def generate_slideshow(
         visual_style: Visual style ("modern", "elegant", "bold")
         output_dir: Override output directory
         auto_id: Automation ID for tracking
+        theme: Visual theme ("auto", "golden_dust", "glitch_titans", etc.)
+        auto_theme: Whether to auto-select theme based on content
     
     Returns:
         Result dictionary with paths and metadata
     """
-    from tiktok_slideshow import TikTokSlideshow
+    # Use themed slideshow if a specific theme is selected
+    use_themed = theme != "auto" or auto_theme
     
-    log(f"🎴 Starting slideshow generation: {topic}", auto_id)
-    log(f"   Model: {model}, Font: {font_name}, Style: {visual_style}", auto_id)
+    if use_themed:
+        from themed_slideshow import ThemedSlideshow
+        log(f"🎴 Starting THEMED slideshow generation: {topic}", auto_id)
+        log(f"   Theme: {theme}, Model: {model}", auto_id)
+    else:
+        from tiktok_slideshow import TikTokSlideshow
+        log(f"🎴 Starting slideshow generation: {topic}", auto_id)
+        log(f"   Model: {model}, Font: {font_name}, Style: {visual_style}", auto_id)
     
     # Determine output directory
     if output_dir is None:
@@ -102,72 +113,104 @@ def generate_slideshow(
     os.makedirs(os.path.join(output_dir, "backgrounds"), exist_ok=True)
     
     try:
-        # Initialize slideshow generator with specified model
-        slideshow = TikTokSlideshow(
-            output_dir=output_dir,
-            image_generator="fal",
-            fal_model=model
-        )
-        
-        # Generate script first
-        log("📝 Step 1: Generating script with Gemini...", auto_id)
-        script = slideshow._generate_script(topic)
-        
-        if not script:
-            log("❌ Failed to generate script", auto_id)
-            return {"success": False, "error": "Script generation failed"}
-        
-        # Add font/style settings to script
-        script['font_name'] = font_name
-        script['visual_style'] = visual_style
-        
-        slides = script.get('slides', [])
-        title = script.get('title', topic)
-        
-        log(f"   ✅ Script generated: {title} ({len(slides)} slides)", auto_id)
-        
-        # Generate backgrounds
-        log(f"🎨 Step 2: Generating {len(slides)} backgrounds with {model}...", auto_id)
-        
-        safe_name = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
-        safe_name = safe_name.replace(' ', '_')[:50]
-        
-        # Add model suffix to distinguish outputs
-        safe_name = f"{safe_name}_{model}"
-        
-        background_paths = []
-        for i, slide in enumerate(slides):
-            bg_path = slideshow._generate_background(slide, safe_name, i)
-            if bg_path:
-                background_paths.append(bg_path)
-                log(f"   ✅ Background {i+1}/{len(slides)} generated", auto_id)
-            else:
-                # Fallback to solid background
-                fallback_path = os.path.join(
-                    slideshow.backgrounds_dir, 
-                    f"{safe_name}_bg_{i}.png"
-                )
-                slideshow._create_fallback_background(fallback_path)
-                background_paths.append(fallback_path)
-                log(f"   ⚠️ Background {i+1}/{len(slides)} fallback used", auto_id)
-        
-        # Burn text onto images
-        log(f"📝 Step 3: Burning text with {font_name} font...", auto_id)
-        
-        image_paths = []
-        for i, slide in enumerate(slides):
-            bg_path = background_paths[i] if i < len(background_paths) else background_paths[-1]
-            output_path = os.path.join(output_dir, f"{safe_name}_slide_{i}.png")
-            
-            final_path = slideshow._burn_text_onto_slide(
-                background_path=bg_path,
-                slide=slide,
-                output_path=output_path,
-                font_name=font_name,
-                visual_style=visual_style
+        # Use themed slideshow if theme is specified
+        if use_themed:
+            themed_slideshow = ThemedSlideshow(
+                theme=theme if theme != "auto" else "auto",
+                output_dir=output_dir,
+                fal_model=model
             )
-            image_paths.append(final_path)
-            log(f"   ✅ Slide {i+1}/{len(slides)} complete", auto_id)
+            
+            # Generate using themed pipeline
+            result = themed_slideshow.create(topic)
+            
+            if not result.get('script'):
+                log("❌ Failed to generate themed slideshow", auto_id)
+                return {"success": False, "error": "Themed slideshow generation failed"}
+            
+            script = result['script']
+            slides = result['slides']
+            image_paths = result['image_paths']
+            background_paths = result.get('background_paths', [])
+            title = script.get('title', topic)
+            theme_name = result.get('theme_name', theme)
+            
+            log(f"   ✅ Themed slideshow generated: {title} ({len(slides)} slides)", auto_id)
+            log(f"   🎨 Theme used: {theme_name}", auto_id)
+            
+            # Calculate safe_name for consistency
+            safe_name = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
+            safe_name = safe_name.replace(' ', '_')[:50]
+            safe_name = f"{safe_name}_{model}"
+            
+        else:
+            # Use standard TikTokSlideshow
+            # Initialize slideshow generator with specified model
+            slideshow = TikTokSlideshow(
+                output_dir=output_dir,
+                image_generator="fal",
+                fal_model=model
+            )
+            
+            # Generate script first
+            log("📝 Step 1: Generating script with Gemini...", auto_id)
+            script = slideshow._generate_script(topic)
+            
+            if not script:
+                log("❌ Failed to generate script", auto_id)
+                return {"success": False, "error": "Script generation failed"}
+            
+            # Add font/style settings to script
+            script['font_name'] = font_name
+            script['visual_style'] = visual_style
+            
+            slides = script.get('slides', [])
+            title = script.get('title', topic)
+            
+            log(f"   ✅ Script generated: {title} ({len(slides)} slides)", auto_id)
+            
+            # Generate backgrounds
+            log(f"🎨 Step 2: Generating {len(slides)} backgrounds with {model}...", auto_id)
+            
+            safe_name = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
+            safe_name = safe_name.replace(' ', '_')[:50]
+            
+            # Add model suffix to distinguish outputs
+            safe_name = f"{safe_name}_{model}"
+            
+            background_paths = []
+            for i, slide in enumerate(slides):
+                bg_path = slideshow._generate_background(slide, safe_name, i)
+                if bg_path:
+                    background_paths.append(bg_path)
+                    log(f"   ✅ Background {i+1}/{len(slides)} generated", auto_id)
+                else:
+                    # Fallback to solid background
+                    fallback_path = os.path.join(
+                        slideshow.backgrounds_dir, 
+                        f"{safe_name}_bg_{i}.png"
+                    )
+                    slideshow._create_fallback_background(fallback_path)
+                    background_paths.append(fallback_path)
+                    log(f"   ⚠️ Background {i+1}/{len(slides)} fallback used", auto_id)
+            
+            # Burn text onto images
+            log(f"📝 Step 3: Burning text with {font_name} font...", auto_id)
+            
+            image_paths = []
+            for i, slide in enumerate(slides):
+                bg_path = background_paths[i] if i < len(background_paths) else background_paths[-1]
+                output_path = os.path.join(output_dir, f"{safe_name}_slide_{i}.png")
+                
+                final_path = slideshow._burn_text_onto_slide(
+                    background_path=bg_path,
+                    slide=slide,
+                    output_path=output_path,
+                    font_name=font_name,
+                    visual_style=visual_style
+                )
+                image_paths.append(final_path)
+                log(f"   ✅ Slide {i+1}/{len(slides)} complete", auto_id)
         
         # Save script for reference
         script_path = os.path.join(output_dir, f"{safe_name}_script.json")
@@ -182,7 +225,7 @@ def generate_slideshow(
         log(f"✅ Slideshow complete! {len(image_paths)} slides generated", auto_id)
         log(f"   📁 Output: {output_dir}", auto_id)
         
-        return {
+        result_dict = {
             "success": True,
             "title": title,
             "model": model,
@@ -193,6 +236,13 @@ def generate_slideshow(
             "script_path": script_path,
             "output_dir": output_dir
         }
+        
+        # Add theme info if using themed slideshow
+        if use_themed:
+            result_dict["theme"] = theme
+            result_dict["theme_name"] = theme_name if 'theme_name' in dir() else theme
+        
+        return result_dict
         
     except Exception as e:
         log(f"❌ Error generating slideshow: {e}", auto_id)
@@ -309,7 +359,9 @@ def run_automation_loop(
     auto_id: str = None,
     enable_voice: bool = False,
     enable_video_transitions: bool = False,
-    recycle_topics: bool = False
+    recycle_topics: bool = False,
+    theme: str = "auto",
+    auto_theme: bool = True
 ):
     """
     Run continuous automation loop processing topics from file.
@@ -323,11 +375,14 @@ def run_automation_loop(
         enable_voice: Whether to generate voice narration
         enable_video_transitions: Whether to add AI video transitions
         recycle_topics: Whether to add completed topics back to queue
+        theme: Visual theme for slideshows
+        auto_theme: Whether to auto-select theme based on content
     """
     log(f"🚀 Starting automation loop", auto_id)
     log(f"   Model: {model}")
     log(f"   Type: {automation_type}")
     log(f"   Font: {font_name}")
+    log(f"   Theme: {theme} (auto: {auto_theme})")
     log(f"   Topics file: {topics_file}")
     log(f"   Voice: {'Enabled' if enable_voice else 'Disabled'}")
     log(f"   Video Transitions: {'Enabled' if enable_video_transitions else 'Disabled'}")
@@ -358,7 +413,9 @@ def run_automation_loop(
             topic=topic,
             model=model,
             font_name=font_name,
-            auto_id=auto_id
+            auto_id=auto_id,
+            theme=theme,
+            auto_theme=auto_theme
         )
         
         if result.get("success"):
@@ -493,6 +550,20 @@ def main():
         help="Recycle completed topics back to queue"
     )
     
+    parser.add_argument(
+        "--theme",
+        type=str,
+        default="auto",
+        choices=["auto", "golden_dust", "glitch_titans", "oil_contrast", "scene_portrait"],
+        help="Visual theme for slideshow generation"
+    )
+    
+    parser.add_argument(
+        "--auto-theme",
+        action="store_true",
+        help="Automatically select theme based on content type"
+    )
+    
     args = parser.parse_args()
     
     # Comparison mode
@@ -523,7 +594,9 @@ def main():
             auto_id=args.auto_id,
             enable_voice=args.voice,
             enable_video_transitions=args.video_transitions,
-            recycle_topics=args.recycle
+            recycle_topics=args.recycle,
+            theme=args.theme,
+            auto_theme=args.auto_theme
         )
         sys.exit(0)
     
@@ -534,7 +607,9 @@ def main():
             model=args.model,
             font_name=args.font,
             visual_style=args.style,
-            auto_id=args.auto_id
+            auto_id=args.auto_id,
+            theme=args.theme,
+            auto_theme=args.auto_theme
         )
         
         if result.get("success"):

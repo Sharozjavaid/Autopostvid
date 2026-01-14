@@ -227,9 +227,15 @@ async def delete_automation(automation_id: str, db: Session = Depends(get_db)):
     return None
 
 
+def get_scheduler():
+    """Lazy load scheduler to avoid circular imports."""
+    from ..services.scheduler import get_scheduler as _get_scheduler
+    return _get_scheduler()
+
+
 @router.post("/{automation_id}/start")
 async def start_automation(automation_id: str, db: Session = Depends(get_db)):
-    """Start an automation."""
+    """Start an automation - schedules it to run at configured times."""
     automation = db.query(Automation).filter(Automation.id == automation_id).first()
     if not automation:
         raise HTTPException(status_code=404, detail="Automation not found")
@@ -237,24 +243,46 @@ async def start_automation(automation_id: str, db: Session = Depends(get_db)):
     if automation.status == "running":
         raise HTTPException(status_code=400, detail="Automation already running")
 
-    # TODO: Actually start the background process
+    # Update status
     automation.status = "running"
     automation.is_active = True
     db.commit()
+    db.refresh(automation)
+    
+    # Schedule with the background scheduler
+    try:
+        scheduler = get_scheduler()
+        scheduler.schedule_automation(automation)
+    except Exception as e:
+        # Log but don't fail - automation is still marked as running
+        print(f"Warning: Failed to schedule automation: {e}")
 
-    return {"success": True, "message": "Automation started", "status": automation.status}
+    return {
+        "success": True,
+        "message": "Automation started and scheduled",
+        "status": automation.status,
+        "next_run": automation.next_run.isoformat() if automation.next_run else None
+    }
 
 
 @router.post("/{automation_id}/stop")
 async def stop_automation(automation_id: str, db: Session = Depends(get_db)):
-    """Stop an automation."""
+    """Stop an automation - removes it from the scheduler."""
     automation = db.query(Automation).filter(Automation.id == automation_id).first()
     if not automation:
         raise HTTPException(status_code=404, detail="Automation not found")
 
-    # TODO: Actually stop the background process
+    # Unschedule from background scheduler
+    try:
+        scheduler = get_scheduler()
+        scheduler.unschedule_automation(automation_id)
+    except Exception as e:
+        print(f"Warning: Failed to unschedule automation: {e}")
+
+    # Update status
     automation.status = "stopped"
     automation.is_active = False
+    automation.next_run = None
     db.commit()
 
     return {"success": True, "message": "Automation stopped", "status": automation.status}
@@ -262,7 +290,7 @@ async def stop_automation(automation_id: str, db: Session = Depends(get_db)):
 
 @router.post("/{automation_id}/pause")
 async def pause_automation(automation_id: str, db: Session = Depends(get_db)):
-    """Pause an automation."""
+    """Pause an automation - temporarily stops scheduling."""
     automation = db.query(Automation).filter(Automation.id == automation_id).first()
     if not automation:
         raise HTTPException(status_code=404, detail="Automation not found")
@@ -270,7 +298,15 @@ async def pause_automation(automation_id: str, db: Session = Depends(get_db)):
     if automation.status != "running":
         raise HTTPException(status_code=400, detail="Can only pause running automations")
 
+    # Unschedule but keep status as paused
+    try:
+        scheduler = get_scheduler()
+        scheduler.unschedule_automation(automation_id)
+    except Exception as e:
+        print(f"Warning: Failed to unschedule automation: {e}")
+
     automation.status = "paused"
+    automation.next_run = None
     db.commit()
 
     return {"success": True, "message": "Automation paused", "status": automation.status}
@@ -287,9 +323,46 @@ async def resume_automation(automation_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Can only resume paused automations")
 
     automation.status = "running"
+    automation.is_active = True
     db.commit()
+    db.refresh(automation)
+    
+    # Re-schedule
+    try:
+        scheduler = get_scheduler()
+        scheduler.schedule_automation(automation)
+    except Exception as e:
+        print(f"Warning: Failed to schedule automation: {e}")
 
-    return {"success": True, "message": "Automation resumed", "status": automation.status}
+    return {
+        "success": True,
+        "message": "Automation resumed",
+        "status": automation.status,
+        "next_run": automation.next_run.isoformat() if automation.next_run else None
+    }
+
+
+@router.post("/{automation_id}/run-now")
+async def run_automation_now(automation_id: str, db: Session = Depends(get_db)):
+    """Trigger an immediate run of the automation (for testing)."""
+    automation = db.query(Automation).filter(Automation.id == automation_id).first()
+    if not automation:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    
+    if not automation.topics or len(automation.topics) == 0:
+        raise HTTPException(status_code=400, detail="No topics in queue. Add topics first.")
+    
+    try:
+        scheduler = get_scheduler()
+        scheduler.run_now(automation_id)
+        
+        return {
+            "success": True,
+            "message": "Automation triggered - check runs for status",
+            "topic": automation.get_next_topic()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to trigger run: {str(e)}")
 
 
 @router.post("/{automation_id}/run-once")
@@ -540,4 +613,123 @@ async def reorder_topics(
         "success": True,
         "topics": automation.topics,
         "total": len(automation.topics)
+    }
+
+
+# =============================================================================
+# RUN HISTORY
+# =============================================================================
+
+@router.get("/{automation_id}/runs")
+async def get_automation_runs(
+    automation_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    """Get run history for an automation."""
+    from ..models import AutomationRun
+    
+    automation = db.query(Automation).filter(Automation.id == automation_id).first()
+    if not automation:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    
+    runs = db.query(AutomationRun).filter(
+        AutomationRun.automation_id == automation_id
+    ).order_by(AutomationRun.started_at.desc()).limit(limit).all()
+    
+    return {
+        "automation_id": automation_id,
+        "runs": [run.to_dict() for run in runs],
+        "total": len(runs)
+    }
+
+
+@router.get("/{automation_id}/runs/{run_id}")
+async def get_automation_run(
+    automation_id: str,
+    run_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get details of a specific run."""
+    from ..models import AutomationRun
+    
+    run = db.query(AutomationRun).filter(
+        AutomationRun.id == run_id,
+        AutomationRun.automation_id == automation_id
+    ).first()
+    
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    return run.to_dict()
+
+
+# =============================================================================
+# SCHEDULER STATUS
+# =============================================================================
+
+@router.get("/scheduler/status")
+async def get_scheduler_status():
+    """Get the status of the background scheduler."""
+    try:
+        scheduler = get_scheduler()
+        return scheduler.get_status()
+    except Exception as e:
+        return {
+            "running": False,
+            "error": str(e),
+            "job_count": 0,
+            "jobs": []
+        }
+
+
+# =============================================================================
+# TIKTOK SETTINGS
+# =============================================================================
+
+class TikTokSettingsUpdate(BaseModel):
+    """Update TikTok posting settings."""
+    post_to_tiktok: bool = False
+    post_to_drafts: bool = True
+
+
+@router.put("/{automation_id}/tiktok-settings")
+async def update_tiktok_settings(
+    automation_id: str,
+    data: TikTokSettingsUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update TikTok posting settings for an automation."""
+    automation = db.query(Automation).filter(Automation.id == automation_id).first()
+    if not automation:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    
+    settings = automation.settings or {}
+    settings["post_to_tiktok"] = data.post_to_tiktok
+    settings["post_to_drafts"] = data.post_to_drafts
+    automation.settings = settings
+    db.commit()
+    
+    return {
+        "success": True,
+        "post_to_tiktok": data.post_to_tiktok,
+        "post_to_drafts": data.post_to_drafts
+    }
+
+
+@router.get("/{automation_id}/tiktok-settings")
+async def get_tiktok_settings(
+    automation_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get TikTok posting settings for an automation."""
+    automation = db.query(Automation).filter(Automation.id == automation_id).first()
+    if not automation:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    
+    settings = automation.settings or {}
+    
+    return {
+        "post_to_tiktok": settings.get("post_to_tiktok", False),
+        "post_to_drafts": settings.get("post_to_drafts", True)
     }

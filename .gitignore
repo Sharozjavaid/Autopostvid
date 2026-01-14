@@ -46,3 +46,32 @@ Thumbs.db
 # TikTok tokens (sensitive)
 .tiktok_tokens.json
 .tiktok_pkce.json
+
+# Database files
+*.db
+*.db.backup_*
+
+# State files
+automations_state.json
+cost_tracking.json
+production_history.json
+completed_slideshow.txt
+completed_slideshows.txt
+
+# Cursor IDE
+.cursor/
+
+# Test outputs
+test_output_*.json
+test_themes_output/
+font_test_output/
+font_samples/
+test_slides/
+
+# Memory/cache
+memory/
+
+# Frontend build artifacts (Vercel handles this)
+frontend/dist/
+frontend/node_modules/
+frontend/.vercel/

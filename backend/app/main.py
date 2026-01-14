@@ -1,5 +1,6 @@
 """FastAPI main application entry point."""
 import os
+import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -12,6 +13,7 @@ from .routers import projects, scripts, slides, images, automations, tiktok
 from .websocket.progress import router as ws_router
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -26,10 +28,28 @@ async def lifespan(app: FastAPI):
     settings.generated_videos_dir.mkdir(parents=True, exist_ok=True)
     settings.generated_slides_dir.mkdir(parents=True, exist_ok=True)
 
+    # Start the automation scheduler
+    try:
+        from .services.scheduler import get_scheduler
+        scheduler = get_scheduler()
+        scheduler.start()
+        logger.info("Automation scheduler started")
+    except Exception as e:
+        logger.error(f"Failed to start scheduler: {e}")
+
     yield
 
     # Shutdown
     print("Shutting down...")
+    
+    # Stop the scheduler
+    try:
+        from .services.scheduler import get_scheduler
+        scheduler = get_scheduler()
+        scheduler.stop()
+        logger.info("Automation scheduler stopped")
+    except Exception as e:
+        logger.error(f"Error stopping scheduler: {e}")
 
 
 app = FastAPI(
@@ -108,6 +128,8 @@ async def get_available_models():
             {"id": "dalle3", "name": "DALL-E 3", "provider": "OpenAI"}
         ],
         "fonts": [
+            {"id": "tiktok", "name": "TikTok Sans", "style": "Official TikTok Font, Clean & Modern"},
+            {"id": "tiktok-bold", "name": "TikTok Sans Bold", "style": "Official TikTok Display Font"},
             {"id": "social", "name": "Social (Default)", "style": "Clean, Readable, Sentence Case", "default": True},
             {"id": "bebas", "name": "Bebas Neue", "style": "Bold, Impact, All-Caps"},
             {"id": "montserrat", "name": "Montserrat", "style": "Modern, Clean"},
