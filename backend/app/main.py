@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings
 from .database import init_db
-from .routers import projects, scripts, slides, images, automations, tiktok
+from .routers import projects, scripts, slides, images, automations, tiktok, agent, gallery, inspiration
 from .websocket.progress import router as ws_router
 
 settings = get_settings()
@@ -83,6 +83,16 @@ if settings.generated_slides_dir.exists():
         name="slides"
     )
 
+# Mount static files for automation-generated slideshows
+# These are stored in generated_slideshows/gpt15/, generated_slideshows/flux/, etc.
+generated_slideshows_dir = settings.base_dir / "generated_slideshows"
+if generated_slideshows_dir.exists():
+    app.mount(
+        "/static/slideshows",
+        StaticFiles(directory=str(generated_slideshows_dir)),
+        name="slideshows"
+    )
+
 # Include routers
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
 app.include_router(scripts.router, prefix="/api/scripts", tags=["scripts"])
@@ -90,7 +100,19 @@ app.include_router(slides.router, prefix="/api/slides", tags=["slides"])
 app.include_router(images.router, prefix="/api/images", tags=["images"])
 app.include_router(automations.router, prefix="/api/automations", tags=["automations"])
 app.include_router(tiktok.router, prefix="/api/tiktok", tags=["tiktok"])
+app.include_router(agent.router, tags=["agent"])  # Agent router (already has /api/agent prefix)
+app.include_router(gallery.router, tags=["gallery"])  # Gallery router (already has /api/gallery prefix)
+app.include_router(inspiration.router, tags=["inspiration"])  # Inspiration/reference library
 app.include_router(ws_router, tags=["websocket"])
+
+# Mount references directory for inspiration frames
+references_dir = settings.base_dir / "references" / "examples"
+if references_dir.exists():
+    app.mount(
+        "/static/references",
+        StaticFiles(directory=str(references_dir)),
+        name="references"
+    )
 
 
 @app.get("/")

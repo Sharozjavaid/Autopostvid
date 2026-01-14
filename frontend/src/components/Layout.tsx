@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutGrid,
@@ -11,11 +11,17 @@ import {
   Zap,
   ChevronRight,
   FileText,
-  Timer
+  Timer,
+  LogOut,
+  Bot,
+  Lightbulb,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const navItems = [
   { to: '/', icon: LayoutGrid, label: 'Dashboard', description: 'Overview & quick actions' },
+  { to: '/agent', icon: Bot, label: 'AI Agent', description: 'Claude-powered assistant', featured: true },
+  { to: '/inspiration', icon: Lightbulb, label: 'Inspiration', description: 'Reference examples' },
   { to: '/projects', icon: FolderOpen, label: 'Projects', description: 'All your creations' },
   { to: '/script-generator', icon: FileText, label: 'Script Generator', description: 'AI-powered scripts' },
   { to: '/static-slideshow', icon: Image, label: 'Static Slideshow', description: 'Image slideshows' },
@@ -26,6 +32,13 @@ const navItems = [
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', position: 'relative' }}>
@@ -236,6 +249,34 @@ export default function Layout() {
               </div>
             </div>
           </motion.div>
+
+          {/* Logout button */}
+          <motion.button
+            onClick={handleLogout}
+            style={{
+              width: '100%',
+              marginTop: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              background: 'rgba(239, 68, 68, 0.05)',
+              color: '#dc2626',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 500,
+            }}
+            whileHover={{ 
+              background: 'rgba(239, 68, 68, 0.1)',
+              borderColor: 'rgba(239, 68, 68, 0.3)',
+            }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <LogOut size={18} />
+            <span>Sign Out</span>
+          </motion.button>
         </div>
       </aside>
 

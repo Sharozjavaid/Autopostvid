@@ -147,10 +147,10 @@ export default function Automations() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: '600', color: '#fff', marginBottom: '8px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
             Automations
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.6)' }}>
+          <p style={{ color: '#64748b', fontSize: '15px' }}>
             Create recipes to automatically generate slideshows on a schedule
           </p>
         </div>
@@ -161,13 +161,13 @@ export default function Automations() {
 
       {/* Automations Grid */}
       {isLoading ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: 'rgba(255,255,255,0.6)' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: '#64748b' }}>
           Loading automations...
         </div>
       ) : automations.length === 0 ? (
-        <GlassCard>
-          <div style={{ textAlign: 'center', padding: '48px' }}>
-            <p style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '16px' }}>
+        <GlassCard padding="xl">
+          <div style={{ textAlign: 'center', padding: '32px' }}>
+            <p style={{ color: '#64748b', marginBottom: '16px', fontSize: '15px' }}>
               No automations yet. Create one to get started!
             </p>
             <Button onClick={() => setShowCreateModal(true)}>
@@ -176,7 +176,7 @@ export default function Automations() {
           </div>
         </GlassCard>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: '20px' }}>
           {automations.map((automation) => (
             <AutomationCard
               key={automation.id}
@@ -271,60 +271,78 @@ function AutomationCard({
   const isRunning = automation.status === 'running';
 
   return (
-    <GlassCard>
-      <div style={{ padding: '4px' }}>
+    <GlassCard padding="lg">
+      <div>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-          <div>
-            <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#fff', marginBottom: '4px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 style={{ 
+              fontSize: '17px', 
+              fontWeight: '600', 
+              color: '#1e293b', 
+              marginBottom: '8px',
+              lineHeight: '1.3',
+            }}>
               {automation.name}
             </h3>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               <span style={{
-                padding: '2px 8px',
-                borderRadius: '4px',
+                padding: '4px 10px',
+                borderRadius: '6px',
                 fontSize: '11px',
-                background: 'rgba(99, 102, 241, 0.3)',
-                color: '#a5b4fc',
+                fontWeight: '500',
+                background: 'rgba(99, 102, 241, 0.15)',
+                color: '#6366f1',
               }}>
                 {contentType?.name || automation.content_type}
               </span>
               <span style={{
-                padding: '2px 8px',
-                borderRadius: '4px',
+                padding: '4px 10px',
+                borderRadius: '6px',
                 fontSize: '11px',
-                background: 'rgba(236, 72, 153, 0.3)',
-                color: '#f9a8d4',
+                fontWeight: '500',
+                background: 'rgba(236, 72, 153, 0.15)',
+                color: '#ec4899',
               }}>
                 {imageStyle?.name || automation.image_style}
               </span>
             </div>
           </div>
           <div style={{
-            padding: '4px 10px',
+            padding: '5px 12px',
             borderRadius: '9999px',
             fontSize: '12px',
-            fontWeight: '500',
-            background: isRunning ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-            color: isRunning ? '#4ade80' : 'rgba(255,255,255,0.5)',
+            fontWeight: '600',
+            background: isRunning ? 'rgba(34, 197, 94, 0.15)' : 'rgba(100, 116, 139, 0.1)',
+            color: isRunning ? '#16a34a' : '#64748b',
+            marginLeft: '12px',
+            flexShrink: 0,
           }}>
             {automation.status}
           </div>
         </div>
 
         {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(3, 1fr)', 
+          gap: '12px', 
+          marginBottom: '16px',
+          padding: '12px',
+          background: 'rgba(148, 163, 184, 0.08)',
+          borderRadius: '12px',
+        }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '20px', fontWeight: '600', color: '#fff' }}>{automation.topics?.length || 0}</div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>Topics</div>
+            <div style={{ fontSize: '22px', fontWeight: '700', color: '#334155' }}>{automation.topics?.length || 0}</div>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Topics</div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '20px', fontWeight: '600', color: '#4ade80' }}>{automation.successful_runs}</div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>Completed</div>
+            <div style={{ fontSize: '22px', fontWeight: '700', color: '#16a34a' }}>{automation.successful_runs}</div>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Completed</div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '20px', fontWeight: '600', color: '#f87171' }}>{automation.failed_runs}</div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>Failed</div>
+            <div style={{ fontSize: '22px', fontWeight: '700', color: '#dc2626' }}>{automation.failed_runs}</div>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Failed</div>
           </div>
         </div>
 
@@ -335,16 +353,17 @@ function AutomationCard({
             alignItems: 'center',
             gap: '8px',
             marginBottom: '12px',
-            padding: '8px 12px',
-            background: 'rgba(255,255,255,0.05)',
-            borderRadius: '8px',
+            padding: '10px 14px',
+            background: 'rgba(99, 102, 241, 0.08)',
+            borderRadius: '10px',
+            border: '1px solid rgba(99, 102, 241, 0.15)',
           }}>
             <ClockIcon />
-            <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>
+            <span style={{ fontSize: '13px', color: '#475569', fontWeight: '500' }}>
               {automation.schedule_times.join(', ')}
             </span>
             {automation.schedule_days && automation.schedule_days.length > 0 && automation.schedule_days.length < 7 && (
-              <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+              <span style={{ fontSize: '12px', color: '#94a3b8' }}>
                 ({automation.schedule_days.map(d => d.slice(0, 3)).join(', ')})
               </span>
             )}
@@ -358,12 +377,13 @@ function AutomationCard({
             alignItems: 'center',
             gap: '8px',
             marginBottom: '12px',
-            padding: '8px 12px',
-            background: 'rgba(255,255,255,0.05)',
-            borderRadius: '8px',
+            padding: '10px 14px',
+            background: 'rgba(34, 197, 94, 0.08)',
+            borderRadius: '10px',
+            border: '1px solid rgba(34, 197, 94, 0.15)',
           }}>
             <MailIcon />
-            <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>
+            <span style={{ fontSize: '13px', color: '#475569' }}>
               {automation.email_address}
             </span>
           </div>
@@ -386,7 +406,7 @@ function AutomationCard({
             disabled={isLoading}
             style={{ flex: 1 }}
           >
-            <SampleIcon /> {isLoading ? 'Generating...' : 'Sample'}
+            <SampleIcon /> {isLoading ? '...' : 'Sample'}
           </Button>
           <Button variant="secondary" onClick={onSelect} style={{ flex: 1 }}>
             Edit
@@ -394,7 +414,7 @@ function AutomationCard({
           <Button
             variant="secondary"
             onClick={onDelete}
-            style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.2)' }}
+            style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)', color: '#dc2626' }}
           >
             <TrashIcon />
           </Button>

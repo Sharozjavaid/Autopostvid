@@ -1,63 +1,10 @@
-# Philosophy Video Generator - Cursor Rules
+# Philosophy Video Generator - 
 
 ## Project Overview
 This is a full-stack application for generating AI-powered philosophy-themed slideshows and videos.
 - **Backend**: FastAPI + SQLAlchemy + SQLite (Python 3.11+)
 - **Frontend**: React + TypeScript + Vite + TanStack Query
 - **AI Services**: OpenAI GPT-4, Gemini, ElevenLabs, fal.ai
-
-## Sub-Agent Patterns (Context Switching)
-
-When working on specific areas, apply these specialized knowledge patterns:
-
-### 🗄️ Database Agent
-**Trigger**: Any work involving database, models, migrations, SQLAlchemy, or schema changes.
-
-**Key Knowledge**:
-1. Database file is at `./philosophy_generator.db` (relative to working directory - run from project root!)
-2. SQLite doesn't support all ALTER TABLE operations - see Database section for migration patterns
-3. Never use `metadata` as a column name (reserved by SQLAlchemy)
-4. Always check schema with `PRAGMA table_info(tablename)` before/after changes
-5. When adding columns, update BOTH the SQLAlchemy model AND run ALTER TABLE on existing databases
-6. Models auto-create tables but DON'T auto-add columns to existing tables
-
-**Checklist for Schema Changes**:
-- [ ] Update SQLAlchemy model in `backend/app/models/`
-- [ ] Run `ALTER TABLE` on local dev database
-- [ ] Verify with `PRAGMA table_info()`
-- [ ] Restart backend to pick up model changes
-- [ ] Update this rules file's Database Schema section
-
-### 🤖 Agent System Agent
-**Trigger**: Work on the AI agent, tools, memory, or Claude integration.
-
-**Key Knowledge**:
-1. Model config is in ONE place: `backend/app/config.py` → `CLAUDE_MODEL`
-2. Agent tools are in `backend/app/services/agent_tools.py`
-3. System prompt is in `backend/app/services/agent_service.py`
-4. Memory files are in `/memory/` - agent has tools to read/write them
-5. Agent uses streaming SSE for responses
-
-### 📱 TikTok Integration Agent
-**Trigger**: Work on TikTok posting, OAuth, or social media features.
-
-**Key Knowledge**:
-1. ALL uploads go to DRAFTS (never direct publish)
-2. Videos use `/v2/post/publish/inbox/video/init/`
-3. Photo slideshows use `/v2/post/publish/content/init/` with `post_mode: "MEDIA_UPLOAD"`
-4. Images MUST be JPEG (not PNG) for photo posts
-5. Tokens stored in `.tiktok_tokens.json`
-6. Local testing won't work - TikTok needs public URLs
-
-### 🎨 Image Generation Agent
-**Trigger**: Work on image generation, fonts, themes, or text overlay.
-
-**Key Knowledge**:
-1. Two-layer system: AI background + Pillow text overlay
-2. Fonts are in `/fonts/` directory
-3. Font config is in BOTH `text_overlay.py` files (root + backend)
-4. Theme prompts are in `theme_config.py`
-5. Always generate background first, then apply text
 
 ## Directory Structure
 ```
@@ -327,28 +274,20 @@ ANTHROPIC_API_KEY=...
 
 ## Claude API Configuration
 
-### Model Selection (SINGLE SOURCE OF TRUTH)
-
-The Claude model is configured in ONE place only: **`backend/app/config.py`**
+### Model Selection
+The agent uses Claude for tool-calling. Model is configured in `agent_runner.py`:
 
 ```python
-# backend/app/config.py - THE ONLY PLACE TO CHANGE THE MODEL
+# Current model (change this to switch)
 CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
-CLAUDE_MAX_TOKENS = 16384
-CLAUDE_MAX_ITERATIONS = 25
 
 # Available models for prompt caching:
 # - claude-sonnet-4-5-20250929 (recommended - best price/performance)
-# - claude-opus-4-20250514 (most capable, expensive)
+# - claude-opus-4-20250514 (most capable)
 # - claude-haiku-3-5-20241022 (fastest/cheapest)
 ```
 
-All other files import from this config:
-- `backend/app/services/agent_service.py` - Imports `CLAUDE_MODEL`, `CLAUDE_MAX_TOKENS`, `CLAUDE_MAX_ITERATIONS`
-- `agent_runner.py` - Imports with fallback for standalone CLI use
-- `agent_tools.py` - Imports with fallback for standalone CLI use
-
-**To change the model:** Edit `backend/app/config.py` and restart the backend. That's it.
+**Important**: Also update `agent_tools.py` if you change the model (used for vision analysis).
 
 ### Prompt Caching
 We use Anthropic's prompt caching for 90% cost reduction on repeated content:
@@ -368,10 +307,8 @@ Monitor cache usage in logs:
 ```
 
 ### Key Files
-- `backend/app/config.py` - **SINGLE SOURCE** for CLAUDE_MODEL constant
-- `backend/app/services/agent_service.py` - Main agent service (imports from config)
-- `agent_runner.py` - CLI agent runner (imports from config with fallback)
-- `agent_tools.py` - Tool definitions (imports from config with fallback)
+- `agent_runner.py` - Main agent with CLAUDE_MODEL constant
+- `agent_tools.py` - Tool definitions + vision analysis (also uses CLAUDE_MODEL)
 
 ### Frontend (.env in /frontend)
 ```
@@ -379,180 +316,9 @@ VITE_API_URL=http://127.0.0.1:8001  # or production URL
 ```
 
 ## Database
-
-### Overview
-- **Engine**: SQLite with SQLAlchemy ORM
-- **Database File**: `./philosophy_generator.db` (relative to working directory)
-- **Config**: `backend/app/database.py` uses `settings.database_url`
-- **Models**: Auto-create tables on startup via `Base.metadata.create_all()`
-
-**⚠️ IMPORTANT**: The database path is RELATIVE (`sqlite:///./philosophy_generator.db`). 
-When running from project root, it uses `./philosophy_generator.db` in root.
-When running from `/backend/`, it would use `/backend/philosophy_generator.db`.
-Always run uvicorn from project root to use the correct database.
-
-### Database Schema
-
-#### `projects` - Main project/slideshow container
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | VARCHAR(36) PK | UUID |
-| `name` | VARCHAR(255) | Project display name |
-| `topic` | TEXT | Full topic/prompt description |
-| `content_type` | VARCHAR(50) | 'slideshow' or 'video' |
-| `script_style` | VARCHAR(50) | 'list', 'narrative', 'mentor_slideshow', 'wisdom_slideshow' |
-| `status` | VARCHAR(50) | 'draft', 'script_review', 'script_approved', 'generating', 'complete', 'error' |
-| `script_approved` | VARCHAR(1) | 'Y' or 'N' |
-| `settings` | JSON | `{"image_model": "gpt15", "font": "bebas", "theme": "dark"}` |
-| `created_at` | DATETIME | |
-| `updated_at` | DATETIME | |
-
-#### `slides` - Individual slides within a project
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | VARCHAR(36) PK | UUID |
-| `project_id` | VARCHAR(36) FK | References projects.id |
-| `order_index` | INTEGER | 0-based slide order |
-| `title` | TEXT | Main text (often ALL CAPS) |
-| `subtitle` | TEXT | Secondary text |
-| `visual_description` | TEXT | AI image prompt |
-| `narration` | TEXT | Voice-over script (if applicable) |
-| `background_image_path` | VARCHAR(500) | AI-generated background (no text) |
-| `final_image_path` | VARCHAR(500) | Background + text overlay |
-| `video_clip_path` | VARCHAR(500) | For video projects |
-| `current_font` | VARCHAR(50) | 'tiktok-bold', 'bebas', etc. |
-| `current_theme` | VARCHAR(50) | 'oil_contrast', 'golden_dust', etc. |
-| `current_version` | INTEGER | Version number for history |
-| `image_status` | VARCHAR(50) | 'pending', 'generating', 'complete', 'error' |
-| `error_message` | TEXT | Error details if failed |
-| `created_at` | DATETIME | |
-| `updated_at` | DATETIME | |
-
-#### `slide_versions` - Version history for slides
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | VARCHAR(36) PK | UUID |
-| `slide_id` | VARCHAR(36) FK | References slides.id |
-| `version_number` | INTEGER | 1, 2, 3... |
-| `title`, `subtitle`, `visual_description`, `narration` | TEXT | Snapshot of content |
-| `font`, `theme` | VARCHAR(50) | Font/theme used |
-| `background_image_path`, `final_image_path` | VARCHAR(500) | Image paths |
-| `change_type` | VARCHAR(50) | 'initial', 'text_edit', 'font_change', 'theme_change', 'regenerate', 'revert' |
-| `change_description` | TEXT | Human-readable description |
-| `version_metadata` | JSON | Additional data |
-| `created_at` | DATETIME | |
-
-#### `automations` - Scheduled content generation
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | VARCHAR(36) PK | UUID |
-| `name` | VARCHAR(255) | Automation name |
-| `content_type` | VARCHAR(50) | 'wisdom_slideshow', 'mentor_slideshow', etc. |
-| `image_style` | VARCHAR(50) | 'classical', 'cinematic', etc. |
-| `topics` | JSON | List of topics to cycle through |
-| `current_topic_index` | INTEGER | Current position in topics list |
-| `schedule_times` | JSON | ['09:00', '14:00'] |
-| `schedule_days` | JSON | ['mon', 'tue', 'wed', 'thu', 'fri'] |
-| `status` | VARCHAR(50) | 'idle', 'running', 'paused' |
-| `is_active` | BOOLEAN | Whether automation is enabled |
-| `last_run`, `next_run` | DATETIME | Timing |
-| `total_runs`, `successful_runs`, `failed_runs` | INTEGER | Stats |
-| `email_enabled` | BOOLEAN | Send notifications |
-| `email_address` | VARCHAR(255) | Notification email |
-| `settings` | JSON | Additional settings |
-| `config` | JSON | Legacy config field |
-| `created_at`, `updated_at` | DATETIME | |
-
-#### `automation_runs` - History of automation executions
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | VARCHAR(36) PK | UUID |
-| `automation_id` | VARCHAR(36) FK | References automations.id |
-| `topic` | VARCHAR(500) | Topic used for this run |
-| `status` | VARCHAR(50) | 'running', 'success', 'error' |
-| `started_at`, `completed_at` | DATETIME | Timing |
-| `duration_seconds` | INTEGER | How long it took |
-| `project_id` | VARCHAR(36) | Created project ID |
-| `slides_count` | INTEGER | Number of slides generated |
-| `image_paths` | JSON | List of generated image paths |
-| `tiktok_posted` | BOOLEAN | Whether posted to TikTok |
-| `tiktok_publish_id` | VARCHAR(100) | TikTok's publish ID |
-| `error_message`, `error_details` | TEXT/JSON | Error info |
-| `created_at` | DATETIME | |
-
-#### `gallery_items` - Agent gallery for saved content
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | VARCHAR(36) PK | UUID |
-| `item_type` | VARCHAR(50) | 'slide', 'script', 'prompt', 'image', 'project' |
-| `project_id`, `slide_id` | VARCHAR(36) | Optional references |
-| `title`, `subtitle`, `description` | TEXT | Content |
-| `image_url`, `thumbnail_url` | VARCHAR(500) | Image URLs |
-| `font`, `theme`, `content_style` | VARCHAR(50) | Styling info |
-| `extra_data` | JSON | Additional metadata (NOT 'metadata' - reserved!) |
-| `status` | VARCHAR(50) | 'complete', 'draft', 'failed' |
-| `session_id` | VARCHAR(36) | Agent session that created it |
-| `created_at`, `updated_at` | DATETIME | |
-
-#### `generation_logs` - API call/cost tracking
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | VARCHAR(36) PK | UUID |
-| `project_id` | VARCHAR(36) FK | Optional reference |
-| `action` | VARCHAR(100) | 'generate_image', 'generate_script', etc. |
-| `model_used` | VARCHAR(100) | 'gpt15', 'claude-sonnet-4-5', etc. |
-| `details` | JSON | Request/response details |
-| `cost` | FLOAT | Estimated cost in USD |
-| `tokens_used` | INTEGER | Token count |
-| `success` | BOOLEAN | Whether it succeeded |
-| `error_message` | TEXT | Error if failed |
-| `created_at` | DATETIME | |
-
-### Database Migrations
-
-SQLite doesn't support all ALTER TABLE operations. For adding columns:
-
-```bash
-# Add a column with default value
-sqlite3 philosophy_generator.db "ALTER TABLE projects ADD COLUMN new_column VARCHAR(50) DEFAULT 'value';"
-
-# Verify
-sqlite3 philosophy_generator.db "PRAGMA table_info(projects);"
-```
-
-For complex migrations (rename column, change type), you need to:
-1. Create new table with correct schema
-2. Copy data from old table
-3. Drop old table
-4. Rename new table
-
-### Common Database Operations
-
-```bash
-# Check table schema
-sqlite3 philosophy_generator.db "PRAGMA table_info(slides);"
-
-# List all tables
-sqlite3 philosophy_generator.db ".tables"
-
-# Query project with slides
-sqlite3 philosophy_generator.db "SELECT p.name, COUNT(s.id) as slides FROM projects p LEFT JOIN slides s ON p.id = s.project_id GROUP BY p.id;"
-
-# Copy data between databases
-sqlite3 philosophy_generator.db << 'EOF'
-ATTACH DATABASE 'backend/philosophy_generator.db' AS other;
-INSERT INTO slides SELECT * FROM other.slides WHERE project_id = 'uuid';
-DETACH DATABASE other;
-EOF
-```
-
-### Model Files
-- `backend/app/models/project.py` - Project model
-- `backend/app/models/slide.py` - Slide model with versioning
-- `backend/app/models/automation.py` - Automation model
-- `backend/app/models/gallery_item.py` - Gallery model
-
-**⚠️ CRITICAL**: Never use `metadata` as a column name - it's reserved by SQLAlchemy!
+- SQLite database at `/backend/philosophy_generator.db`
+- Models auto-create tables on startup
+- Use Alembic for production migrations if needed
 
 ## Testing Changes
 1. Backend auto-reloads with `--reload` flag
@@ -633,61 +399,21 @@ gcloud compute firewall-rules list --filter="name~http"
 
 ### TikTok Integration
 
-**⚠️ CRITICAL: ALL UPLOADS GO TO DRAFTS (USER'S INBOX)**
+**⚠️ CRITICAL: DRAFTS ONLY via MEDIA_UPLOAD mode**
 - All TikTok uploads go to DRAFTS (user's inbox), never direct publish
-- User's TikTok account can be PUBLIC - sandbox mode works with public accounts for drafts
-- User completes and publishes the post from their TikTok app
+- User's TikTok account can be PUBLIC - we use `post_mode: "MEDIA_UPLOAD"` which works with public accounts
+- NEVER use `post_mode: "DIRECT_POST"` - that requires private accounts in sandbox mode
+- The `MEDIA_UPLOAD` mode sends content to user's TikTok inbox/drafts where they complete the post
 - NEVER change code to post directly to TikTok feed
 
-**Two Different Endpoints for Videos vs Photo Slideshows:**
+**API Modes (IMPORTANT):**
+- `MEDIA_UPLOAD` = Sends to inbox/drafts ✅ (works with public accounts, user completes post in app)
+- `DIRECT_POST` = Publishes directly ❌ (requires private account in sandbox - DO NOT USE)
 
-| Content Type | Endpoint | How to Send to Drafts | Backend File |
-|-------------|----------|----------------------|--------------|
-| **Videos** | `/v2/post/publish/inbox/video/init/` | Use this endpoint directly (it's the inbox endpoint) | `tiktok_cli.py`, `agent_tools.py`, `routers/tiktok.py` |
-| **Photo Slideshows** | `/v2/post/publish/content/init/` | Use `post_mode: "MEDIA_UPLOAD"` | `services/tiktok_poster.py` |
-
-**Video Uploads to Drafts:**
-```python
-# Endpoint for videos -> drafts
-INBOX_VIDEO_URL = "https://open.tiktokapis.com/v2/post/publish/inbox/video/init/"
-
-# Just use FILE_UPLOAD source, no post_mode needed
-payload = {
-    "source_info": {
-        "source": "FILE_UPLOAD",
-        "video_size": file_size,
-        "chunk_size": file_size,
-        "total_chunk_count": 1
-    }
-}
-```
-
-**Photo Slideshow Uploads to Drafts:**
-```python
-# Endpoint for photos (same endpoint, different mode)
-PHOTO_CONTENT_URL = "https://open.tiktokapis.com/v2/post/publish/content/init/"
-
-# CRITICAL: Use MEDIA_UPLOAD mode for drafts, NOT DIRECT_POST
-payload = {
-    "post_info": {
-        "title": caption,
-        "description": caption
-    },
-    "source_info": {
-        "source": "PULL_FROM_URL",
-        "photo_cover_index": 0,
-        "photo_images": ["https://...jpg", "https://...jpg"]  # Must be JPEG/WebP!
-    },
-    "post_mode": "MEDIA_UPLOAD",  # ✅ Sends to drafts (works with public accounts)
-    "media_type": "PHOTO"
-}
-# NEVER use "post_mode": "DIRECT_POST" - requires private account in sandbox
-```
-
-**Image Format for Photo Slideshows (CRITICAL):**
+**Image Format (CRITICAL):**
 - TikTok photo API only accepts **JPEG (.jpg)** or **WebP** format
-- **PNG files will FAIL** with `file_format_check_failed` error
-- Always generate/convert images to JPEG before posting to TikTok
+- PNG files will fail with `file_format_check_failed` error
+- Always generate/convert images to JPEG before posting
 - The `tiktok_poster.py` automatically converts paths to .jpg URLs
 
 **Configuration:**
@@ -695,14 +421,6 @@ payload = {
 - **Domain Verification**: ✅ `api.cofndrly.com` is verified in TikTok Developer Portal
 - **Scopes**: `user.info.basic`, `video.upload`, `video.publish`
 - Tokens stored in `.tiktok_tokens.json` (gitignored)
-- Access tokens expire in 24 hours, refresh tokens last 365 days
-- Token refresh happens automatically in `tiktok_poster.py`
-
-**Key Backend Files:**
-- `backend/app/services/tiktok_poster.py` - Photo slideshow posting (MEDIA_UPLOAD mode)
-- `backend/app/routers/tiktok.py` - Video upload endpoints
-- `backend/app/services/agent_tools.py` - Agent's TikTok upload tool
-- `tiktok_cli.py` - CLI for manual uploads and auth
 
 TikTok CLI commands:
 ```bash
@@ -712,14 +430,11 @@ python tiktok_cli.py auth
 # Exchange code for tokens
 python tiktok_cli.py token --code "YOUR_CODE"
 
-# Refresh expired access token (uses refresh token)
-python tiktok_cli.py refresh
-
 # Upload video to drafts
 python tiktok_cli.py upload --video "path/to/video.mp4" --title "Caption"
 
-# Upload photo slideshow to drafts (images must be JPEG, not PNG!)
-python tiktok_cli.py slideshow --images "img1.jpg,img2.jpg" --title "Caption"
+# Upload photo slideshow (uses native TikTok slideshow)
+python tiktok_cli.py slideshow --images "img1.png,img2.png" --title "Caption"
 
 # Check upload status
 python tiktok_cli.py status --publish-id "PUBLISH_ID"
@@ -786,46 +501,6 @@ Set `post_to_tiktok: true` in automation settings to automatically post slidesho
 The project uses GitHub Actions for automated deployment. See `.github/workflows/deploy.yml`.
 
 ## AI Agent & Gallery System
-
-### Agent Memory System
-
-The agent has a persistent memory system in `/memory/` that survives across sessions:
-
-**Memory Files:**
-```
-/memory/
-  ├── current_project.json     # Active project ID + session summary
-  ├── conversation_summary.txt # Rolling history of conversations
-  ├── insights.txt             # Agent's learned preferences/patterns
-  └── learnings/               # Category-specific learnings
-      └── fonts.json           # Font preferences, etc.
-```
-
-**Memory Tools (available to the agent):**
-| Tool | Purpose |
-|------|---------|
-| `get_session_context` | Load previous context at session start |
-| `save_session_context` | Save project ID + summary before ending |
-| `add_agent_insight` | Record learnings to insights.txt |
-| `store_learning` | Save category-specific learnings |
-| `get_learnings` | Retrieve past learnings |
-
-**Session Continuity Protocol (in system prompt):**
-1. Agent calls `get_session_context` at the START of every conversation
-2. If there's a saved project, agent acknowledges it
-3. Agent saves context with `save_session_context` before conversation ends
-4. Agent records insights with `add_agent_insight` when learning preferences
-
-**Example Flow:**
-```
-User: (starts new session)
-Agent: (calls get_session_context)
-       "Welcome back! Last time we were working on '5 Most Dangerous Men'..."
-
-User: "Post it to TikTok"
-Agent: (calls post_slideshow_to_tiktok)
-       (calls save_session_context with summary)
-```
 
 ### Agent Page Architecture (`/frontend/src/pages/Agent.tsx`)
 The AI Agent page is a **full-page chat interface** with integrated gallery:

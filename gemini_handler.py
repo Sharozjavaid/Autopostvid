@@ -430,6 +430,221 @@ class GeminiHandler:
             print(f"Error generating image prompt: {e}")
             return None
     
+    def generate_mentor_slideshow(self, topic: str) -> Dict:
+        """
+        Generate a philosophical mentor-style slideshow script.
+        
+        Written in a direct, no-nonsense motivational tone using second person "you"
+        with occasional first-person plural "we" for solidarity.
+        
+        Structure:
+        - Slide 1: Hook (1 text item, 6-10 words, large font)
+        - Slides 2-6: Three-part structure each:
+            1. Short philosophical insight/mental trap (6-12 words, medium-large font)
+            2. "What it does:" (3-6 words, small font)
+            3. "Why it matters:" (10-20 words, small font)
+        - Final slide: 2-3 text items:
+            1. Rhetorical question/statement (6-10 words, medium font)
+            2. Call to action (8-15 words, small font)
+            3. Philosophical truth/encouragement (8-12 words, small font)
+        """
+        
+        prompt = f"""
+        You are a PHILOSOPHICAL MENTOR texting hard truths to someone ready to level up their thinking.
+        
+        Your topic: {topic}
+        
+        🎭 YOUR VOICE & PERSONA:
+        - Direct, no-nonsense motivational tone
+        - Second person "you" with occasional "we" for solidarity
+        - 6th-7th grade reading level
+        - You've walked the path of self-discovery — now sharing what ACTUALLY works
+        - Short, punchy 5-10 word sentences mixed with occasional longer reflective statements
+        - Rhetorical questions that challenge assumptions
+        - Repetition of key philosophical concepts for emphasis
+        - Direct callouts that make readers examine their own thinking patterns
+        
+        ✍️ WRITING STYLE:
+        - Simple everyday words blended with accessible philosophical terminology
+        - Periods for emphasis after short declarative statements
+        - Occasional ellipses (...) for contemplative pauses
+        - Questions to provoke self-reflection
+        - Staccato and urgent when calling out mental traps
+        - Calm and grounding when offering philosophical wisdom
+        - Sentence fragments for impact
+        - NO corporate speak — you're a philosophical coach who respects their intelligence
+        - Occasional ALL CAPS for philosophical concepts or pivotal realizations
+        - Concrete, relatable vocabulary translating ancient wisdom into modern struggles
+        
+        📱 MODERN STRUGGLES TO CONNECT TO:
+        - Scrolling and distraction
+        - Purpose and meaning
+        - Self-awareness and growth
+        - Comparison and insecurity
+        - Overthinking and anxiety
+        
+        📝 SLIDE STRUCTURE (MUST FOLLOW EXACTLY):
+        
+        **SLIDE 1 — THE HOOK**
+        - 1 text item only
+        - 6-10 words MAXIMUM
+        - Large font energy — this stops the scroll
+        - Make it provocative, challenging, or deeply relatable
+        - Examples: "Your mind is lying to you. Again.", "Nobody taught you how to think."
+        
+        **SLIDES 2-6 — THE CONTENT (5 slides total)**
+        Each slide has EXACTLY 3 text items:
+        
+        1. **Main insight** (medium-large font): 6-12 words
+           - A philosophical insight OR mental trap being called out
+           - Direct, punchy, makes them pause
+           - Examples: "You're chasing happiness. That's why you don't have it."
+           
+        2. **"What it does:"** (small font): 3-6 words
+           - Brief label explaining the psychological mechanism
+           - Start with "What it does:" then the explanation
+           - Examples: "What it does: Keeps you stuck in loops."
+           
+        3. **"Why it matters:"** (small font): 10-20 words
+           - Connects the insight to personal growth or philosophical understanding
+           - Start with "Why it matters:" then the explanation
+           - Examples: "Why it matters: When you stop chasing, you create space for peace to find you."
+        
+        **SLIDE 7 — THE OUTRO**
+        2-3 text items:
+        
+        1. **Rhetorical question or statement** (medium font): 6-10 words
+           - Challenges them to reflect
+           - Examples: "What are you really running from?", "The work starts now."
+           
+        2. **Call to action** (small font): 8-15 words
+           - Encourage saving, reflecting, or continuing the journey
+           - Examples: "Save this. Read it again when your mind starts lying."
+           
+        3. **Philosophical truth** (small font, optional but recommended): 8-12 words
+           - Encouraging or grounding final thought
+           - Examples: "The truth was always inside you. You just forgot."
+        
+        🔥 EMOTIONAL ARC:
+        - Start with CONFRONTATION (uncomfortable truths)
+        - Move through RECOGNITION (they see themselves)
+        - End with EMPOWERMENT (deeper understanding)
+        
+        ❌ DON'T:
+        - Use corporate jargon ("leverage", "optimize", "synergy")
+        - Be preachy or condescending
+        - Use complex philosophical jargon without context
+        - Make it feel like a lecture
+        
+        ✅ DO:
+        - Make them feel SEEN
+        - Challenge their assumptions
+        - Use "you" frequently
+        - Reference modern struggles (phones, scrolling, comparison)
+        - Ground ancient wisdom in TODAY's problems
+        
+        📋 FORMAT AS VALID JSON:
+        {{
+            "title": "Short catchy title",
+            "topic": "{topic}",
+            "content_type": "mentor_slideshow",
+            "writing_style": "philosophical_mentor",
+            "total_slides": 7,
+            "slides": [
+                {{
+                    "slide_number": 1,
+                    "slide_type": "hook",
+                    "text_items": [
+                        {{
+                            "text": "Your mind is lying to you. Again.",
+                            "font_size": "large",
+                            "word_count": 7
+                        }}
+                    ],
+                    "visual_description": "Dark moody background with fractured mirror or distorted reflection, philosophical and introspective"
+                }},
+                {{
+                    "slide_number": 2,
+                    "slide_type": "content",
+                    "text_items": [
+                        {{
+                            "text": "You scroll to escape. But escape from what?",
+                            "font_size": "medium-large",
+                            "word_count": 9
+                        }},
+                        {{
+                            "label": "What it does:",
+                            "text": "Numbs the real questions.",
+                            "font_size": "small",
+                            "word_count": 4
+                        }},
+                        {{
+                            "label": "Why it matters:",
+                            "text": "Every swipe is a vote against facing yourself. The phone isn't the problem — it's the hiding.",
+                            "font_size": "small",
+                            "word_count": 18
+                        }}
+                    ],
+                    "visual_description": "Person illuminated only by phone screen in dark room, zombie-like glow, modern isolation"
+                }},
+                {{
+                    "slide_number": 7,
+                    "slide_type": "outro",
+                    "text_items": [
+                        {{
+                            "text": "What will you choose to see?",
+                            "font_size": "medium",
+                            "word_count": 6
+                        }},
+                        {{
+                            "text": "Save this. Come back when the fog rolls in.",
+                            "font_size": "small",
+                            "word_count": 10
+                        }},
+                        {{
+                            "text": "Clarity was always there. You just stopped looking.",
+                            "font_size": "small",
+                            "word_count": 9
+                        }}
+                    ],
+                    "visual_description": "Person standing at crossroads or doorway with light streaming through, choice and awakening"
+                }}
+            ]
+        }}
+        
+        Generate EXACTLY 7 slides following this structure.
+        Make it feel like a philosophical friend texting you hard truths at 2am.
+        """
+        
+        try:
+            response = self.client.models.generate_content(
+                model=self.text_model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
+            )
+            
+            if not response.text:
+                print("Error: Empty response from model")
+                return None
+                
+            cleaned_text = self._clean_json_text(response.text)
+            slideshow_data = json.loads(cleaned_text)
+            slideshow_data['content_type'] = 'mentor_slideshow'
+            return slideshow_data
+            
+        except Exception as e:
+            print(f"Error generating mentor slideshow: {e}")
+            if "not found" in str(e).lower() or "404" in str(e):
+                print("Model not found, trying gemini-2.0-flash-exp...")
+                try:
+                    self.text_model_name = 'gemini-2.0-flash-exp'
+                    return self.generate_mentor_slideshow(topic)
+                except:
+                    pass
+            return None
+
     def generate_slideshow_script(self, topic: str) -> Dict:
         """
         Generate a slideshow script for children's-book-style slides.

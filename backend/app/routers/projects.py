@@ -1,13 +1,18 @@
 """Projects API router - CRUD operations for projects."""
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
+from pydantic import BaseModel
 
 from ..database import get_db
 from ..models import Project, Slide
 from ..schemas import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectList
 from ..schemas.project import SlideResponse
+from ..services.tiktok_poster import TikTokPoster
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -149,3 +154,84 @@ async def get_project_stats(project_id: str, db: Session = Depends(get_db)):
         "errors": errors,
         "progress_percent": (completed / total_slides * 100) if total_slides > 0 else 0
     }
+
+
+class TikTokPostRequest(BaseModel):
+    """Request body for posting to TikTok."""
+    caption: Optional[str] = None
+
+
+@router.post("/{project_id}/post-to-tiktok")
+async def post_project_to_tiktok(
+    project_id: str,
+    request: TikTokPostRequest,
+    db: Session = Depends(get_db)
+):
+    """Post a project's slideshow to TikTok drafts.
+    
+    This sends all completed slide images to TikTok as a photo slideshow.
+    The slideshow will appear in the user's TikTok inbox/drafts.
+    """
+    # Get the project
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Get all slides sorted by order
+    slides = sorted(project.slides, key=lambda s: s.order_index)
+    
+    # Get completed slides with images
+    completed_slides = [s for s in slides if s.image_status == "complete" and s.final_image_path]
+    
+    if len(completed_slides) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Need at least 2 completed slide images to create a TikTok slideshow"
+        )
+    
+    # Get image paths
+    image_paths = [s.final_image_path for s in completed_slides]
+    
+    # Build caption
+    caption = request.caption or project.topic or project.name or "Philosophy Slideshow"
+    
+    logger.info(f"Posting project {project_id} to TikTok: {len(image_paths)} images, caption='{caption[:50]}...'")
+    
+    # Post to TikTok
+    try:
+        poster = TikTokPoster()
+        
+        if not poster.is_authenticated():
+            raise HTTPException(
+                status_code=401,
+                detail="TikTok not authenticated. Please connect your TikTok account first."
+            )
+        
+        result = poster.post_photo_slideshow(
+            image_paths=image_paths,
+            caption=caption,
+            to_drafts=True,
+            photo_cover_index=0
+        )
+        
+        if result.get("success"):
+            logger.info(f"Successfully posted to TikTok: publish_id={result.get('publish_id')}")
+            return {
+                "success": True,
+                "publish_id": result.get("publish_id"),
+                "image_count": len(image_paths),
+                "message": f"Slideshow with {len(image_paths)} images sent to TikTok drafts!"
+            }
+        else:
+            error_msg = result.get("error", "Unknown error")
+            logger.error(f"TikTok post failed: {error_msg}")
+            return {
+                "success": False,
+                "error": error_msg
+            }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error posting to TikTok: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

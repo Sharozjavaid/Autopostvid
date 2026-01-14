@@ -50,7 +50,9 @@ def get_image_generator(model: str = "gpt15"):
 def get_text_overlay():
     """Get TextOverlay class for programmatic text rendering."""
     from ..services.text_overlay import TextOverlay
-    return TextOverlay(fonts_dir="fonts", default_style="modern")
+    # Fonts are in the project root, one level up from backend/
+    fonts_dir = str(Path(__file__).parent.parent.parent.parent / "fonts")
+    return TextOverlay(fonts_dir=fonts_dir, default_style="modern")
 
 
 async def generate_single_image(

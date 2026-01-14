@@ -59,6 +59,10 @@ class AutomationConfig:
     font_name: str = "social"  # "social", "montserrat", "cinzel", "cormorant", "bebas"
     visual_style: str = "modern"  # "modern", "elegant", "bold", "minimal"
     
+    # Theme settings (new)
+    theme: str = "auto"  # "auto", "golden_dust", "glitch_titans", "oil_contrast", "scene_portrait"
+    auto_theme: bool = True  # Whether to auto-select theme based on content
+    
     # Voice settings
     enable_voice: bool = False  # Whether to add voice narration
     
@@ -161,7 +165,9 @@ class AutomationManager:
         schedule_mode: str = "loop",
         topics: List[str] = None,
         use_topic_file: str = "general",
-        recycle_topics: bool = False
+        recycle_topics: bool = False,
+        theme: str = "auto",
+        auto_theme: bool = True
     ) -> AutomationConfig:
         """Create a new automation configuration.
         
@@ -213,6 +219,8 @@ class AutomationManager:
             topics=topics or [],
             use_topic_file=use_topic_file,
             recycle_topics=recycle_topics,
+            theme=theme,
+            auto_theme=auto_theme,
             created_at=datetime.now().isoformat(),
             status=AutomationStatus.STOPPED
         )
@@ -249,6 +257,11 @@ class AutomationManager:
             cmd.extend(["--style", auto.visual_style])
             cmd.extend(["--auto-id", auto_id])
             cmd.extend(["--topics-file", topic_file])
+            
+            # Theme settings
+            cmd.extend(["--theme", auto.theme])
+            if auto.auto_theme:
+                cmd.append("--auto-theme")
             
             # Voice option
             if auto.enable_voice:
@@ -612,6 +625,42 @@ FONT_STYLES = {
     "bebas": {
         "name": "Bebas Neue",
         "description": "Bold display font - very punchy"
+    }
+}
+
+# =============================================================================
+# VISUAL THEMES - Pre-configured visual styles with dialed-in prompts
+# =============================================================================
+VISUAL_THEMES = {
+    "auto": {
+        "name": "Auto-Select",
+        "description": "Automatically pick the best theme based on content type",
+        "icon": "🎯",
+        "default": True
+    },
+    "golden_dust": {
+        "name": "Golden Dust",
+        "description": "Elegant sepia-toned marble busts with golden particles - clean, educational",
+        "icon": "✨",
+        "best_for": "List slideshows, educational content"
+    },
+    "glitch_titans": {
+        "name": "Glitch Titans",
+        "description": "Dark digital with cracked glass overlay and glitch effects - edgy, viral",
+        "icon": "💥",
+        "best_for": "Bold hooks, younger audience"
+    },
+    "oil_contrast": {
+        "name": "Oil Contrast",
+        "description": "Split-scene Renaissance oil painting - transformation stories",
+        "icon": "🎨",
+        "best_for": "Before/after narratives, contrast content"
+    },
+    "scene_portrait": {
+        "name": "Scene Portrait",
+        "description": "Cinematic scenes with philosophers in historical settings - immersive",
+        "icon": "🎬",
+        "best_for": "Biographical content, single-topic deep dives"
     }
 }
 

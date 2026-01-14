@@ -12,6 +12,7 @@ from voice_generator import VoiceGenerator
 from video_assembler import VideoAssembler
 from email_sender import EmailSender
 from caption_generator import CaptionGenerator
+from fal_video_generator import FalVideoGenerator, check_fal_available
 
 load_dotenv()
 
@@ -230,7 +231,16 @@ def is_within_schedule():
             
     return False
 
-def generate_video_flow(topic: str, image_model: str = None, transition: str = "crossfade", transition_duration: float = 0.3):
+def generate_video_flow(
+    topic: str, 
+    image_model: str = None, 
+    transition: str = "crossfade", 
+    transition_duration: float = 0.3,
+    use_video_transitions: bool = False,
+    fal_resolution: str = "768P",
+    clip_duration: str = "6",
+    voice_id: str = None
+):
     """
     Generate a complete philosophy video from a topic.
     
@@ -239,18 +249,33 @@ def generate_video_flow(topic: str, image_model: str = None, transition: str = "
         image_model: Image generation model ("nano", "openai-dalle3", "openai-gpt-image-1.5")
         transition: Video transition type ("crossfade", "fade_black", "slide_left", etc.)
         transition_duration: Duration of transitions in seconds
+        use_video_transitions: If True, use fal.ai image-to-video instead of static images
+        fal_resolution: Resolution for fal.ai video transitions ("768P" or "1080P")
+        clip_duration: Duration per clip in seconds ("5" or "6")
+        voice_id: ElevenLabs voice ID for narration
     """
     model_name = image_model or DEFAULT_IMAGE_MODEL
-    log_message(f"🚀 STARTING AUTOMATION FOR: '{topic}' [Model: {model_name}]")
+    mode_str = "🎬 VIDEO TRANSITIONS" if use_video_transitions else "📸 STATIC IMAGES"
+    log_message(f"🚀 STARTING AUTOMATION FOR: '{topic}' [Model: {model_name}] [{mode_str}]")
+    
+    # Validate fal.ai availability if using video transitions
+    if use_video_transitions and not check_fal_available():
+        log_message("❌ Video transitions requested but FAL_KEY not set. Falling back to static images.")
+        use_video_transitions = False
     
     # Initialize handlers
     try:
         gemini = GeminiHandler()
         img_gen = create_image_generator(model_name)
         voice_gen = VoiceGenerator()
-        assembler = VideoAssembler()
         email_sender = EmailSender()
         caption_gen = CaptionGenerator()
+        
+        # Only initialize these if NOT using video transitions
+        if not use_video_transitions:
+            assembler = VideoAssembler()
+        else:
+            fal_gen = FalVideoGenerator(resolution=fal_resolution)
     except Exception as e:
         log_message(f"❌ Initialization failed: {e}")
         return None
@@ -273,29 +298,66 @@ def generate_video_flow(topic: str, image_model: str = None, transition: str = "
     if not image_paths:
         log_message("❌ No images generated. Aborting.")
         return None
+    
+    if use_video_transitions and len(image_paths) < 2:
+        log_message("❌ Need at least 2 images for video transitions. Falling back to static.")
+        use_video_transitions = False
+        assembler = VideoAssembler()
             
     # 3. Generate Audio
     # Clean title for filename
     safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '_')
     audio_path = voice_gen.generate_voiceover(
         story_data.get('script', ''),
+        voice_id=voice_id,
         filename=f"{safe_title}_audio.mp3"
     )
     
     if not audio_path or not os.path.exists(audio_path):
         log_message("❌ Audio generation failed. Aborting.")
         return None
+    
+    # 4. Assemble Video
+    if use_video_transitions:
+        # Use fal.ai image-to-video pipeline
+        log_message(f"🎬 Generating AI video transitions ({fal_resolution}, {clip_duration}s clips)...")
         
-    # 4. Assemble Video (with transitions)
-    log_message(f"🎬 Assembling video with {transition} transitions...")
-    video_path = assembler.create_philosophy_video(
-        scenes=scenes,
-        audio_path=audio_path,
-        image_paths=image_paths,
-        story_title=title,
-        transition=transition,
-        transition_duration=transition_duration
-    )
+        # Get scene descriptions for better transition prompts
+        scene_descriptions = [s.get('visual_description', '') for s in scenes]
+        
+        # Generate all transition videos
+        video_clip_paths = fal_gen.generate_all_transitions(
+            image_paths=image_paths,
+            story_title=safe_title,
+            scene_descriptions=scene_descriptions,
+            duration=clip_duration
+        )
+        
+        if not video_clip_paths:
+            log_message("❌ Video transition generation failed.")
+            return None
+        
+        log_message(f"✅ Generated {len(video_clip_paths)} transition clips")
+        
+        # Combine clips with audio
+        log_message("🎬 Creating final video with audio...")
+        video_path = fal_gen.create_final_video_with_audio(
+            video_paths=video_clip_paths,
+            audio_path=audio_path,
+            story_title=safe_title,
+            crossfade_duration=0.5
+        )
+    else:
+        # Use standard static image assembly
+        log_message(f"🎬 Assembling video with {transition} transitions...")
+        video_path = assembler.create_philosophy_video(
+            scenes=scenes,
+            audio_path=audio_path,
+            image_paths=image_paths,
+            story_title=title,
+            transition=transition,
+            transition_duration=transition_duration
+        )
     
     if not video_path:
         log_message("❌ Video assembly failed.")
@@ -307,8 +369,9 @@ def generate_video_flow(topic: str, image_model: str = None, transition: str = "
     log_message(f"✅ Caption ready: {caption[:50]}...")
     
     # 6. Email Video with Caption
-    subject = f"Philosophy Video: {title}"
-    body = f"New video generated for topic: {topic}\n\nTitle: {title}\n\nEnjoy!"
+    mode_label = " (AI Transitions)" if use_video_transitions else ""
+    subject = f"Philosophy Video{mode_label}: {title}"
+    body = f"New video generated for topic: {topic}\n\nTitle: {title}\n\nMode: {mode_str}\n\nEnjoy!"
     
     success = email_sender.send_video(video_path, subject=subject, body=body, caption=caption)
     
@@ -353,6 +416,33 @@ def main():
         help="Transition duration in seconds (default: 0.3)"
     )
     
+    # fal.ai Image-to-Video options
+    parser.add_argument(
+        "--video-transitions",
+        action="store_true",
+        help="Use fal.ai image-to-video for cinematic transitions between scenes (requires FAL_KEY)"
+    )
+    parser.add_argument(
+        "--fal-resolution",
+        type=str,
+        default="768P",
+        choices=["768P", "1080P"],
+        help="Resolution for fal.ai video transitions (default: 768P, $0.045/sec vs $0.09/sec)"
+    )
+    parser.add_argument(
+        "--clip-duration",
+        type=str,
+        default="6",
+        choices=["5", "6"],
+        help="Duration per video clip in seconds (default: 6)"
+    )
+    parser.add_argument(
+        "--voice-id",
+        type=str,
+        default=None,
+        help="ElevenLabs voice ID for narration (default: onwK4e9ZLuTAKqWW03F9)"
+    )
+    
     args = parser.parse_args()
     
     # Handle dedupe mode first (one-time cleanup)
@@ -366,14 +456,29 @@ def main():
     available_models = UnifiedImageGenerator.get_available_models()
     log_message(f"📋 Available image models: {[m.value for m in available_models]}")
     log_message(f"🎨 Using image model: {args.image_model}")
-    log_message(f"🎬 Transition: {args.transition} ({args.transition_duration}s)")
+    
+    if args.video_transitions:
+        if check_fal_available():
+            log_message(f"🎬 Mode: AI Video Transitions (fal.ai)")
+            log_message(f"   Resolution: {args.fal_resolution}")
+            log_message(f"   Clip duration: {args.clip_duration}s")
+        else:
+            log_message("⚠️ FAL_KEY not set, falling back to static image transitions")
+            args.video_transitions = False
+    
+    if not args.video_transitions:
+        log_message(f"🎬 Transition: {args.transition} ({args.transition_duration}s)")
     
     if args.single:
         generate_video_flow(
             args.single, 
             image_model=args.image_model,
             transition=args.transition,
-            transition_duration=args.transition_duration
+            transition_duration=args.transition_duration,
+            use_video_transitions=args.video_transitions,
+            fal_resolution=args.fal_resolution,
+            clip_duration=args.clip_duration,
+            voice_id=args.voice_id
         )
         return
 
@@ -402,7 +507,11 @@ def main():
                             topic,
                             image_model=args.image_model,
                             transition=args.transition,
-                            transition_duration=args.transition_duration
+                            transition_duration=args.transition_duration,
+                            use_video_transitions=args.video_transitions,
+                            fal_resolution=args.fal_resolution,
+                            clip_duration=args.clip_duration,
+                            voice_id=args.voice_id
                         )
                     except Exception as e:
                         log_message(f"🔥 Critical Error: {e}")

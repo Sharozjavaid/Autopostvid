@@ -6,6 +6,11 @@ This module runs the Claude agent with tool-calling capabilities.
 It connects the agent to the tools defined in agent_tools.py and
 manages the conversation flow with memory persistence.
 
+Features:
+- Prompt caching for 90% cost reduction on repeated content
+- Configurable model selection
+- Tool calling with automatic retry
+
 Usage:
     from agent_runner import AgentRunner
     
@@ -30,6 +35,24 @@ load_dotenv()
 # Import local modules
 from agent_tools import AgentTools, TOOL_DEFINITIONS
 from agent_memory import AgentMemory
+
+
+# =============================================================================
+# MODEL CONFIGURATION
+# =============================================================================
+# Import from central config - single source of truth
+# To change the model, edit: backend/app/config.py -> CLAUDE_MODEL
+# =============================================================================
+try:
+    from backend.app.config import CLAUDE_MODEL, CLAUDE_MAX_TOKENS
+    MAX_TOKENS = CLAUDE_MAX_TOKENS
+except ImportError:
+    # Fallback for standalone CLI usage
+    CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
+    MAX_TOKENS = 4096
+
+# Cache TTL: "5m" (default, free refresh) or "1h" (2x write cost, better for infrequent use)
+CACHE_TTL = "5m"
 
 
 class AgentRunner:
@@ -137,16 +160,72 @@ Remember: You're here to create amazing viral content AND continuously improve!"
         
         print("🤖 AgentRunner initialized")
     
-    def _build_tools_for_api(self) -> List[Dict]:
-        """Convert tool definitions to Anthropic API format."""
+    def _build_tools_for_api(self, with_cache_control: bool = True) -> List[Dict]:
+        """
+        Convert tool definitions to Anthropic API format with optional caching.
+        
+        Per Anthropic docs: Place cache_control on the LAST tool to cache all tools
+        as a single prefix. Tools rarely change, making them ideal for caching.
+        
+        Args:
+            with_cache_control: Whether to add cache_control to the last tool
+        
+        Returns:
+            List of tool definitions in Anthropic API format
+        """
         tools = []
-        for tool_def in TOOL_DEFINITIONS:
-            tools.append({
+        total_tools = len(TOOL_DEFINITIONS)
+        
+        for i, tool_def in enumerate(TOOL_DEFINITIONS):
+            tool = {
                 "name": tool_def["name"],
                 "description": tool_def["description"],
                 "input_schema": tool_def["parameters"]
-            })
+            }
+            
+            # Add cache_control to the LAST tool only (caches entire tools array)
+            # Per docs: "cache_control on the final tool designates all tools as part of the static prefix"
+            if with_cache_control and i == total_tools - 1:
+                tool["cache_control"] = {"type": "ephemeral"}
+            
+            tools.append(tool)
+        
         return tools
+    
+    def _build_system_prompt_with_cache(self, memory_context: Optional[str] = None) -> List[Dict]:
+        """
+        Build system prompt with cache control for optimal caching.
+        
+        Per Anthropic docs, we use multiple cache breakpoints:
+        1. Static system prompt (rarely changes) - CACHED
+        2. Memory context (changes per session) - CACHED separately
+        
+        This allows the static prompt to be cached even when memory changes.
+        
+        Args:
+            memory_context: Optional memory context to append
+        
+        Returns:
+            List of system prompt blocks with cache_control
+        """
+        system_blocks = []
+        
+        # Block 1: Static system prompt (rarely changes - ideal for caching)
+        system_blocks.append({
+            "type": "text",
+            "text": self.SYSTEM_PROMPT,
+            "cache_control": {"type": "ephemeral"}
+        })
+        
+        # Block 2: Memory context (changes per session, but stable within session)
+        if memory_context:
+            system_blocks.append({
+                "type": "text",
+                "text": f"\n\n## Memory Context\n\n{memory_context}",
+                "cache_control": {"type": "ephemeral"}
+            })
+        
+        return system_blocks
     
     def _execute_tool(self, tool_name: str, tool_input: Dict) -> Dict:
         """
@@ -200,6 +279,11 @@ Remember: You're here to create amazing viral content AND continuously improve!"
         """
         Send a query to the agent and get a response.
         
+        Uses prompt caching for cost optimization:
+        - Tools are cached (rarely change)
+        - System prompt is cached (static)
+        - Memory context is cached separately (stable within session)
+        
         Args:
             user_message: The user's message
             stream: Whether to stream the response
@@ -229,22 +313,30 @@ Remember: You're here to create amazing viral content AND continuously improve!"
         # Get memory context
         memory_context = self.memory.get_context()
         
-        # Build system prompt with memory
-        system_prompt = self.SYSTEM_PROMPT
-        if memory_context:
-            system_prompt += f"\n\n## Memory Context\n\n{memory_context}"
+        # Build system prompt with caching (list of blocks with cache_control)
+        system_blocks = self._build_system_prompt_with_cache(memory_context)
         
-        # Get tools
-        tools = self._build_tools_for_api()
+        # Get tools with cache_control on last tool
+        tools = self._build_tools_for_api(with_cache_control=True)
         
-        # Make API call
+        # Make API call with prompt caching
+        # Cache order per docs: tools → system → messages
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4096,
-            system=system_prompt,
-            tools=tools,
+            model=CLAUDE_MODEL,
+            max_tokens=MAX_TOKENS,
+            system=system_blocks,  # List of blocks with cache_control
+            tools=tools,           # Last tool has cache_control
             messages=self.messages
         )
+        
+        # Log cache usage for monitoring
+        if hasattr(response, 'usage'):
+            usage = response.usage
+            cache_read = getattr(usage, 'cache_read_input_tokens', 0)
+            cache_create = getattr(usage, 'cache_creation_input_tokens', 0)
+            input_tokens = getattr(usage, 'input_tokens', 0)
+            if cache_read > 0 or cache_create > 0:
+                print(f"📊 Cache: read={cache_read}, created={cache_create}, uncached={input_tokens}")
         
         # Process response
         full_response = ""
@@ -304,14 +396,21 @@ Remember: You're here to create amazing viral content AND continuously improve!"
                 "content": tool_use_results
             })
             
-            # Continue conversation
+            # Continue conversation with caching
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=4096,
-                system=system_prompt,
+                model=CLAUDE_MODEL,
+                max_tokens=MAX_TOKENS,
+                system=system_blocks,
                 tools=tools,
                 messages=self.messages
             )
+            
+            # Log cache usage
+            if hasattr(response, 'usage'):
+                usage = response.usage
+                cache_read = getattr(usage, 'cache_read_input_tokens', 0)
+                if cache_read > 0:
+                    print(f"📊 Cache hit: {cache_read} tokens from cache")
         
         # Extract final text response
         for block in response.content:
@@ -376,21 +475,20 @@ Remember: You're here to create amazing viral content AND continuously improve!"
         })
         self.memory.add_message("user", user_message)
         
-        # Build context
+        # Build context with caching
         memory_context = self.memory.get_context()
-        system_prompt = self.SYSTEM_PROMPT
-        if memory_context:
-            system_prompt += f"\n\n## Memory Context\n\n{memory_context}"
+        system_blocks = self._build_system_prompt_with_cache(memory_context)
         
-        tools = self._build_tools_for_api()
+        # Get tools with cache_control
+        tools = self._build_tools_for_api(with_cache_control=True)
         full_response = ""
         tool_results = []
         
-        # Stream response
+        # Stream response with prompt caching
         with client.messages.stream(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4096,
-            system=system_prompt,
+            model=CLAUDE_MODEL,
+            max_tokens=MAX_TOKENS,
+            system=system_blocks,
             tools=tools,
             messages=self.messages
         ) as stream:
@@ -446,11 +544,11 @@ Remember: You're here to create amazing viral content AND continuously improve!"
                 "content": tool_use_results
             })
             
-            # Continue with streaming
+            # Continue with streaming (uses cached tools + system)
             with client.messages.stream(
-                model="claude-sonnet-4-20250514",
-                max_tokens=4096,
-                system=system_prompt,
+                model=CLAUDE_MODEL,
+                max_tokens=MAX_TOKENS,
+                system=system_blocks,
                 tools=tools,
                 messages=self.messages
             ) as stream:

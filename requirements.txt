@@ -19,3 +19,4 @@ apscheduler>=3.10.0
 # Marketing Agent Chat Interface
 anthropic>=0.39.0
 flask>=3.0.0
+sse-starlette>=1.6.0

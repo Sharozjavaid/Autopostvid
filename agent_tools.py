@@ -23,6 +23,18 @@ import json
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
+# =============================================================================
+# MODEL CONFIGURATION
+# =============================================================================
+# Import from central config - single source of truth
+# To change the model, edit: backend/app/config.py -> CLAUDE_MODEL
+# =============================================================================
+try:
+    from backend.app.config import CLAUDE_MODEL
+except ImportError:
+    # Fallback for standalone CLI usage
+    CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
+
 
 class AgentTools:
     """
@@ -737,7 +749,7 @@ Respond in JSON format:
 }}"""
 
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model=CLAUDE_MODEL,
                 max_tokens=1024,
                 messages=[
                     {

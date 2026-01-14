@@ -60,6 +60,32 @@ class TextOverlay:
     # Available font options - each maps to specific font files
     # These can be selected in the UI for instant experimentation
     FONTS = {
+        # TikTok Official Fonts - The authentic TikTok look
+        "tiktok": {
+            "name": "TikTok Sans",
+            "description": "Official TikTok font - authentic app look, clean and modern",
+            "file": "TikTokSans-Regular.ttf",
+            "category": "tiktok",
+            "settings": {
+                "uppercase": False,  # TikTok uses sentence case
+                "shadow": True,      # Drop shadow for legibility
+                "outline": True,     # Thin outline for contrast
+                "outline_width": 2,  # Thin outline
+            }
+        },
+        "tiktok-bold": {
+            "name": "TikTok Sans Display",
+            "description": "Official TikTok display font - bold headlines",
+            "file": "TikTokSans-Bold.ttf",
+            "category": "tiktok",
+            "settings": {
+                "uppercase": False,
+                "shadow": True,
+                "outline": True,
+                "outline_width": 2,
+            }
+        },
+        
         # Social Media Style - Clean, readable, modern
         "social": {
             "name": "Social Media (Clean)",
@@ -119,11 +145,12 @@ class TextOverlay:
     
     # Grouped by style for easy selection
     FONT_CATEGORIES = {
+        "tiktok": ["tiktok", "tiktok-bold"],
         "social": ["social"],
         "modern": ["montserrat", "oswald"],
         "elegant": ["cormorant", "montserrat-italic"],
         "classical": ["cinzel"],
-        "display": ["bebas", "oswald"]
+        "display": ["bebas", "oswald", "tiktok-bold"]
     }
     
     # Legacy style mappings (for backwards compatibility)

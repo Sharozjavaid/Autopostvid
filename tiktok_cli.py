@@ -30,6 +30,7 @@ import secrets
 import hashlib
 import base64
 import webbrowser
+from datetime import datetime
 from pathlib import Path
 
 
@@ -264,16 +265,26 @@ class TikTokCLI:
         if response.status_code == 200:
             result = response.json()
             
-            if "error" in result and result.get("error", {}).get("code") != "ok":
-                print(f"❌ Error: {result['error']}")
-                return
+            # Handle error - can be string or dict
+            if "error" in result:
+                error = result.get("error")
+                if isinstance(error, dict):
+                    if error.get("code") != "ok":
+                        print(f"❌ Error: {error}")
+                        return
+                elif isinstance(error, str) and error:
+                    print(f"❌ Error: {error}")
+                    print(f"   Description: {result.get('error_description', 'N/A')}")
+                    return
             
             tokens["access_token"] = result.get("access_token", tokens["access_token"])
             tokens["refresh_token"] = result.get("refresh_token", tokens["refresh_token"])
             tokens["expires_in"] = result.get("expires_in")
+            tokens["refreshed_at"] = datetime.now().isoformat()
             
             self.save_tokens(tokens)
             print("✅ Token refreshed successfully!")
+            print(f"   New token expires in: {tokens['expires_in']} seconds")
         else:
             print(f"❌ Failed to refresh: {response.status_code}")
             print(f"   Response: {response.text}")

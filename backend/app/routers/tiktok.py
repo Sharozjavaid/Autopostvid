@@ -11,6 +11,11 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+# Load .env file from project root
+env_path = Path(__file__).parent.parent.parent.parent / ".env"
+load_dotenv(env_path)
 
 router = APIRouter()
 
@@ -125,7 +130,7 @@ async def start_auth(request: Request):
     
     params = {
         "client_key": config["client_key"],
-        "scope": "user.info.basic,video.upload",
+        "scope": "user.info.basic,video.upload,video.publish",
         "response_type": "code",
         "redirect_uri": config["redirect_uri"],
         "state": csrf_state,
@@ -159,7 +164,7 @@ async def get_auth_url(request: Request):
     
     params = {
         "client_key": config["client_key"],
-        "scope": "user.info.basic,video.upload",
+        "scope": "user.info.basic,video.upload,video.publish",
         "response_type": "code",
         "redirect_uri": redirect_uri,
         "state": csrf_state,

@@ -455,4 +455,276 @@ export const reorderAutomationTopics = async (automationId: string, topics: stri
   return response.data;
 };
 
+// =============================================================================
+// AGENT API
+// =============================================================================
+
+export interface ToolCall {
+  tool_name: string;
+  tool_input: Record<string, unknown>;
+  result: Record<string, unknown>;
+  success: boolean;
+}
+
+export interface AgentChatResponse {
+  session_id: string;
+  response: string;
+  tool_calls: ToolCall[];
+  iterations: number;
+  timestamp: string;
+  error?: string;
+}
+
+export interface AgentHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp?: string;
+  tool_calls?: ToolCall[];
+}
+
+export interface AgentHistoryResponse {
+  session_id: string;
+  messages: AgentHistoryMessage[];
+  message_count: number;
+}
+
+export interface AgentToolInfo {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  category: string;
+}
+
+export interface AgentToolsResponse {
+  tools: AgentToolInfo[];
+  total: number;
+  categories: string[];
+}
+
+export interface AgentStatusResponse {
+  model: string;
+  max_tokens: number;
+  max_iterations: number;
+  active_sessions: number;
+  available_tools: number;
+}
+
+// Slide preview data from agent tool results
+export interface SlidePreviewData {
+  slide_id: string;
+  slide_index: number;
+  project_id: string;
+  content: {
+    title: string | null;
+    subtitle: string | null;
+  };
+  image: {
+    url: string;
+    background_url: string | null;
+    width: number;
+    height: number;
+  };
+  settings: {
+    font: string;
+    theme: string;
+    model: string;
+  };
+}
+
+// Agent streaming event types
+export type AgentStreamEvent =
+  | { type: 'session'; session_id: string }
+  | { type: 'text'; text: string }
+  | { type: 'thinking'; text: string }
+  | { type: 'tool_start'; tool_name: string; tool_input: Record<string, unknown> }
+  | { type: 'tool_result'; tool_name: string; result: Record<string, unknown>; success: boolean }
+  | { type: 'slide_preview'; slide: SlidePreviewData }
+  | { type: 'done'; iterations: number; tool_count: number }
+  | { type: 'error'; message: string };
+
+// Agent API Functions
+
+export const sendAgentMessage = async (
+  message: string,
+  sessionId?: string
+): Promise<AgentChatResponse> => {
+  const response = await api.post('/api/agent/chat', {
+    message,
+    session_id: sessionId,
+  });
+  return response.data;
+};
+
+export const streamAgentMessage = (
+  message: string,
+  sessionId: string | undefined,
+  onEvent: (event: AgentStreamEvent) => void,
+  onError?: (error: Error) => void,
+  onComplete?: () => void
+): (() => void) => {
+  const params = new URLSearchParams({ message });
+  if (sessionId) params.append('session_id', sessionId);
+  
+  const eventSource = new EventSource(
+    `${API_BASE_URL}/api/agent/chat/stream?${params.toString()}`
+  );
+  
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      onEvent({ type: event.type as AgentStreamEvent['type'], ...data });
+    } catch {
+      // Handle non-JSON events
+    }
+  };
+  
+  // Handle specific event types
+  const eventTypes = ['session', 'text', 'thinking', 'tool_start', 'tool_result', 'slide_preview', 'done', 'error'];
+  eventTypes.forEach((eventType) => {
+    eventSource.addEventListener(eventType, (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        onEvent({ type: eventType as AgentStreamEvent['type'], ...data });
+        
+        if (eventType === 'done' || eventType === 'error') {
+          eventSource.close();
+          onComplete?.();
+        }
+      } catch (e) {
+        console.error('Failed to parse event:', e);
+      }
+    });
+  });
+  
+  eventSource.onerror = (error) => {
+    console.error('SSE error:', error);
+    onError?.(new Error('Connection error'));
+    eventSource.close();
+  };
+  
+  // Return cleanup function
+  return () => {
+    eventSource.close();
+  };
+};
+
+export const getAgentHistory = async (sessionId: string): Promise<AgentHistoryResponse> => {
+  const response = await api.get(`/api/agent/history/${sessionId}`);
+  return response.data;
+};
+
+export const clearAgentSession = async (sessionId: string) => {
+  const response = await api.delete(`/api/agent/session/${sessionId}`);
+  return response.data;
+};
+
+export const getAgentTools = async (): Promise<AgentToolsResponse> => {
+  const response = await api.get('/api/agent/tools');
+  return response.data;
+};
+
+export const getAgentStatus = async (): Promise<AgentStatusResponse> => {
+  const response = await api.get('/api/agent/status');
+  return response.data;
+};
+
+// =============================================================================
+// GALLERY API
+// =============================================================================
+
+export interface GalleryItem {
+  id: string;
+  item_type: 'slide' | 'script' | 'prompt' | 'image' | 'project';
+  project_id: string | null;
+  slide_id: string | null;
+  title: string | null;
+  subtitle: string | null;
+  description: string | null;
+  image_url: string | null;
+  thumbnail_url: string | null;
+  text_content: string | null;
+  font: string | null;
+  theme: string | null;
+  content_style: string | null;
+  metadata: Record<string, unknown> | null;
+  status: 'complete' | 'draft' | 'failed';
+  session_id: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface GalleryItemCreate {
+  item_type?: string;
+  project_id?: string;
+  slide_id?: string;
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  image_url?: string;
+  thumbnail_url?: string;
+  text_content?: string;
+  font?: string;
+  theme?: string;
+  content_style?: string;
+  metadata?: Record<string, unknown>;
+  status?: string;
+  session_id?: string;
+}
+
+export interface GalleryListResponse {
+  items: GalleryItem[];
+  total: number;
+  has_more: boolean;
+}
+
+export interface GalleryStats {
+  total: number;
+  by_type: Record<string, number>;
+  by_status: Record<string, number>;
+  unique_projects: number;
+}
+
+export const getGalleryItems = async (params?: {
+  item_type?: string;
+  status?: string;
+  project_id?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<GalleryListResponse> => {
+  const response = await api.get('/api/gallery', { params });
+  return response.data;
+};
+
+export const createGalleryItem = async (data: GalleryItemCreate): Promise<GalleryItem> => {
+  const response = await api.post('/api/gallery', data);
+  return response.data;
+};
+
+export const getGalleryItem = async (itemId: string): Promise<GalleryItem> => {
+  const response = await api.get(`/api/gallery/${itemId}`);
+  return response.data;
+};
+
+export const updateGalleryItem = async (
+  itemId: string,
+  data: Partial<GalleryItem>
+): Promise<GalleryItem> => {
+  const response = await api.put(`/api/gallery/${itemId}`, data);
+  return response.data;
+};
+
+export const deleteGalleryItem = async (itemId: string): Promise<void> => {
+  await api.delete(`/api/gallery/${itemId}`);
+};
+
+export const clearGallery = async (): Promise<{ success: boolean; deleted: number }> => {
+  const response = await api.delete('/api/gallery');
+  return response.data;
+};
+
+export const getGalleryStats = async (): Promise<GalleryStats> => {
+  const response = await api.get('/api/gallery/stats/summary');
+  return response.data;
+};
+
 export default api;

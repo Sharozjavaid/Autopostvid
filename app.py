@@ -69,6 +69,7 @@ try:
         TOPIC_TYPES,
         TOPIC_FILES,
         FONT_STYLES,
+        VISUAL_THEMES,
         get_pending_topics_count,
         get_completed_topics_count,
         get_recent_completed_topics,
@@ -2079,6 +2080,52 @@ with tab6:
                 
                 st.markdown("---")
                 
+                # Theme Selection (NEW)
+                st.markdown("### 🎨 Visual Theme")
+                st.info("Themes provide pre-configured visual styles with dialed-in image prompts for consistent, professional-looking slideshows.")
+                
+                col_theme, col_sample = st.columns([2, 1])
+                
+                with col_theme:
+                    theme_options = list(VISUAL_THEMES.keys())
+                    theme_labels = [f"{VISUAL_THEMES[t].get('icon', '🎨')} {VISUAL_THEMES[t]['name']}" for t in theme_options]
+                    selected_theme_idx = st.selectbox(
+                        "Visual Theme",
+                        range(len(theme_options)),
+                        format_func=lambda x: theme_labels[x],
+                        help="Select a visual theme for consistent styling"
+                    )
+                    selected_theme = theme_options[selected_theme_idx]
+                    st.caption(VISUAL_THEMES[selected_theme]['description'])
+                    
+                    if selected_theme != "auto":
+                        best_for = VISUAL_THEMES[selected_theme].get('best_for', '')
+                        if best_for:
+                            st.caption(f"💡 Best for: {best_for}")
+                
+                with col_sample:
+                    auto_theme = st.checkbox(
+                        "🎯 Auto-select theme",
+                        value=(selected_theme == "auto"),
+                        help="Let the system pick the best theme based on content type"
+                    )
+                    
+                    # Sample generation button
+                    if selected_theme != "auto":
+                        if st.button(f"🎴 Generate Sample", help=f"Generate a 3-slide sample of the {VISUAL_THEMES[selected_theme]['name']} theme"):
+                            with st.spinner(f"Generating {VISUAL_THEMES[selected_theme]['name']} sample..."):
+                                try:
+                                    from themed_slideshow import generate_theme_sample
+                                    sample_result = generate_theme_sample(selected_theme)
+                                    if sample_result and sample_result.get('image_paths'):
+                                        st.success(f"✅ Sample generated! Check `generated_slideshows/` folder")
+                                        for path in sample_result['image_paths']:
+                                            st.caption(f"📄 {path}")
+                                except Exception as e:
+                                    st.error(f"Sample generation failed: {e}")
+                
+                st.markdown("---")
+                
                 # Voice & Video Options
                 st.markdown("### 🎙️ Voice & Video Options")
                 
@@ -2196,7 +2243,9 @@ with tab6:
                             schedule_mode=selected_schedule,
                             topics=topics_list,
                             use_topic_file=selected_topic_file,
-                            recycle_topics=recycle_topics
+                            recycle_topics=recycle_topics,
+                            theme=selected_theme,
+                            auto_theme=auto_theme
                         )
                         
                         st.success(f"✅ Created automation: **{auto_name}** (ID: {new_auto.id})")
@@ -2205,6 +2254,8 @@ with tab6:
                         summary = []
                         summary.append(f"📋 Type: {TOPIC_TYPES[selected_topic_type]['name']}")
                         summary.append(f"🎨 Model: {IMAGE_MODELS[selected_model]['name']}")
+                        theme_display = "Auto" if auto_theme else VISUAL_THEMES[selected_theme]['name']
+                        summary.append(f"🖼️ Theme: {theme_display}")
                         if enable_voice:
                             summary.append("🎙️ Voice: Enabled")
                         if enable_video_transitions:

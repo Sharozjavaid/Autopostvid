@@ -5,6 +5,26 @@ from pydantic_settings import BaseSettings
 from pathlib import Path
 
 
+# =============================================================================
+# CLAUDE MODEL CONFIGURATION
+# =============================================================================
+# Single source of truth for Claude model used across the application.
+# Change this ONE variable to switch models everywhere.
+#
+# Available models for prompt caching:
+# - claude-sonnet-4-5-20250929 (recommended - best price/performance)
+# - claude-opus-4-20250514 (most capable, expensive)
+# - claude-haiku-3-5-20241022 (fastest/cheapest)
+# =============================================================================
+CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
+
+# Max tokens for Claude responses
+CLAUDE_MAX_TOKENS = 16384
+
+# Max tool call iterations per request
+CLAUDE_MAX_ITERATIONS = 25
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
@@ -22,11 +42,29 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
 
-    # File paths
-    base_dir: Path = Path(__file__).parent.parent.parent.parent
-    generated_images_dir: Path = base_dir / "generated_images"
-    generated_videos_dir: Path = base_dir / "generated_videos"
-    generated_slides_dir: Path = base_dir / "generated_slides"
+    # File paths - resolve base_dir dynamically to work in both local and Docker
+    # Local: backend/app/config.py -> 4 parents -> philosophy_video_generator/
+    # Docker: /app/backend/app/config.py -> 3 parents -> /app/
+    @property
+    def base_dir(self) -> Path:
+        # Check for Docker environment (/app as root)
+        docker_app = Path("/app")
+        if docker_app.exists() and (docker_app / "backend").exists():
+            return docker_app
+        # Local development - 4 parents from this file
+        return Path(__file__).parent.parent.parent.parent
+
+    @property
+    def generated_images_dir(self) -> Path:
+        return self.base_dir / "generated_images"
+    
+    @property
+    def generated_videos_dir(self) -> Path:
+        return self.base_dir / "generated_videos"
+    
+    @property
+    def generated_slides_dir(self) -> Path:
+        return self.base_dir / "generated_slides"
 
     # CORS - allow localhost for dev, Vercel for production
     cors_origins: list[str] = [

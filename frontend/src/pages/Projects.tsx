@@ -210,10 +210,19 @@ export default function Projects() {
             const IconComponent = iconData.icon;
             const statusStyle = getStatusBadge(project.status);
             
+            // Determine if project is complete (all images done)
+            const allImagesComplete = project.slides && project.slides.length > 0 && 
+              project.slides.every((s: any) => s.image_status === 'complete');
+            
+            // Route to completed view if complete, otherwise to editor
+            const projectLink = allImagesComplete 
+              ? `/projects/${project.id}` 
+              : `/static-slideshow/${project.id}`;
+            
             return (
               <motion.div key={project.id} variants={itemVariants}>
                 <GlassCard hover padding="none">
-                  <Link to={`/static-slideshow/${project.id}`} style={{ textDecoration: 'none' }}>
+                  <Link to={projectLink} style={{ textDecoration: 'none' }}>
                     <div style={{ padding: '20px' }}>
                       {/* Header */}
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -318,7 +327,7 @@ export default function Projects() {
                     alignItems: 'center',
                     background: 'rgba(248, 250, 252, 0.5)',
                   }}>
-                    <Link to={`/projects/${project.id}`} style={{ 
+                    <Link to={projectLink} style={{ 
                       fontSize: '13px', 
                       fontWeight: 600, 
                       color: '#667eea',
@@ -326,7 +335,7 @@ export default function Projects() {
                       alignItems: 'center',
                       gap: '4px',
                     }}>
-                      Open Project
+                      {allImagesComplete ? 'View Project' : 'Continue Editing'}
                       <ArrowRight size={14} />
                     </Link>
                     <Button
