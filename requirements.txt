@@ -12,6 +12,8 @@ python-dotenv
 streamlit
 pytz
 fal-client
+pydantic-settings>=2.0.0
+sqlalchemy>=2.0.0
 
 # Marketing Agent Chat Interface
 anthropic>=0.39.0
