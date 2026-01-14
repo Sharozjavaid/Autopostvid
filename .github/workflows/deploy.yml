@@ -59,12 +59,24 @@ jobs:
 
       - name: Copy project files to VM
         run: |
-          gcloud compute scp --recurse --zone=${{ env.ZONE }} \
-            --exclude='.git/*' \
-            --exclude='__pycache__/*' \
-            --exclude='*.pyc' \
-            --exclude='.env' \
-            . ${{ env.VM_NAME }}:~/philosophy_video_generator
+          # Create a tarball excluding unwanted files
+          tar --exclude='.git' \
+              --exclude='__pycache__' \
+              --exclude='*.pyc' \
+              --exclude='.env' \
+              --exclude='node_modules' \
+              --exclude='*.log' \
+              -czf /tmp/project.tar.gz .
+          
+          # Copy tarball to VM
+          gcloud compute scp --zone=${{ env.ZONE }} /tmp/project.tar.gz ${{ env.VM_NAME }}:~/project.tar.gz
+          
+          # Extract on VM
+          gcloud compute ssh ${{ env.VM_NAME }} --zone=${{ env.ZONE }} --command="
+            cd ~/philosophy_video_generator && \
+            tar -xzf ~/project.tar.gz && \
+            rm ~/project.tar.gz
+          "
 
       - name: Build and run new container
         run: |
