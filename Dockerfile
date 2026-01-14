@@ -30,8 +30,9 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 # Note: Uncomment to enable scheduled production
 # RUN echo "0 16 * * * cd /app && python3 daily_production.py >> /var/log/daily-production.log 2>&1" | crontab -
 
-# Expose port for Streamlit
+# Expose ports for Streamlit and FastAPI
 EXPOSE 8501
+EXPOSE 8001
 
 # Run both services via supervisor
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
