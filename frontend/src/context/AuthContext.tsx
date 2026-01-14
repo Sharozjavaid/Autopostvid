@@ -9,8 +9,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 // Credentials - in production, these would be environment variables or backend-validated
-const VALID_USERNAME = 'shabrowski';
-const VALID_PASSWORD = 'PhilosophizeMe2922';
+const VALID_USERNAME = 'sharoz75';
+const VALID_PASSWORD = 'rosebud';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
