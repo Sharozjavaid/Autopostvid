@@ -27,7 +27,11 @@ env/
 
 # Logs
 *.log
+*.log.*.bak
 automation.log
+logs/*.log
+logs/*.bak
+!logs/.gitkeep
 
 # OS files
 .DS_Store
@@ -38,3 +42,7 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# TikTok tokens (sensitive)
+.tiktok_tokens.json
+.tiktok_pkce.json
