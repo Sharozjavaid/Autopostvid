@@ -34,6 +34,7 @@ jobs:
       - name: Create .env file on VM
         run: |
           gcloud compute ssh ${{ env.VM_NAME }} --zone=${{ env.ZONE }} --command="
+            mkdir -p ~/philosophy_video_generator && \
             cat > ~/philosophy_video_generator/.env << 'EOF'
           GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
           ELEVENLABS_API_KEY=${{ secrets.ELEVENLABS_API_KEY }}
@@ -42,6 +43,7 @@ jobs:
           ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
           TIKTOK_CLIENT_KEY=${{ secrets.TIKTOK_CLIENT_KEY }}
           TIKTOK_CLIENT_SECRET=${{ secrets.TIKTOK_CLIENT_SECRET }}
+          TIKTOK_REDIRECT_URI=${{ secrets.TIKTOK_REDIRECT_URI }}
           EMAIL_SENDER=${{ secrets.EMAIL_SENDER }}
           EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}
           EMAIL_RECIPIENT=${{ secrets.EMAIL_RECIPIENT }}
