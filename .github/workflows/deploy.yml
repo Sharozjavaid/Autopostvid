@@ -82,7 +82,7 @@ jobs:
         run: |
           gcloud compute ssh ${{ env.VM_NAME }} --zone=${{ env.ZONE }} --command="
             cd ~/philosophy_video_generator && \
-            sudo docker build -t ${{ env.IMAGE_NAME }} . && \
+            sudo docker build --no-cache -t ${{ env.IMAGE_NAME }} . && \
             sudo docker run -d --name philosophy-agent \
               -p 8501:8501 \
               -p 8001:8001 \
