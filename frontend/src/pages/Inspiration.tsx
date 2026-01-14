@@ -16,13 +16,13 @@ import {
   Link as LinkIcon,
   ChevronLeft,
   ChevronRight,
-  Play,
   Tag,
 } from 'lucide-react';
 import GlassCard from '../components/GlassCard';
 import Button from '../components/Button';
+import { API_BASE_URL } from '../api/client';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = API_BASE_URL;
 
 // API functions
 const fetchReferences = async (formatType?: string, tags?: string) => {

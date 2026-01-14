@@ -11,7 +11,6 @@ import {
   Download,
   ArrowLeft,
   Edit3,
-  Eye,
   ChevronDown,
   ChevronUp,
   ExternalLink,
@@ -29,7 +28,7 @@ import {
   API_BASE_URL,
   api
 } from '../api/client';
-import type { Project, Slide } from '../api/client';
+// Note: Project type is used for type inference
 import GlassCard from '../components/GlassCard';
 import Button from '../components/Button';
 
@@ -55,7 +54,8 @@ const getTikTokStatus = async () => {
 export default function CompletedProjectView() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  // Query client available for future invalidation needs
+  useQueryClient();
   
   const [expandedSection, setExpandedSection] = useState<string | null>('images');
   const [selectedSlideIndex, setSelectedSlideIndex] = useState<number | null>(null);

@@ -9,7 +9,6 @@ import {
   API_BASE_URL,
   type AgentStreamEvent,
   type ToolCall,
-  type AgentToolInfo,
   type SlidePreviewData,
 } from '../api/client';
 import { useGallery, type GalleryItem } from '../context/GalleryContext';
@@ -700,7 +699,7 @@ export default function Agent() {
   const cleanupRef = useRef<(() => void) | null>(null);
   
   // Queries
-  const { data: toolsData } = useQuery({
+  const { data: _toolsData } = useQuery({
     queryKey: ['agent-tools'],
     queryFn: getAgentTools,
   });

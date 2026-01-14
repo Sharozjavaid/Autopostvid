@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getGalleryItems,
@@ -93,7 +93,7 @@ export function GalleryProvider({ children }: { children: ReactNode }) {
       project_id: slide.project_id,
       slide_id: slide.slide_id,
       title: slide.content.title || `Slide ${slide.slide_index + 1}`,
-      subtitle: slide.content.subtitle,
+      subtitle: slide.content.subtitle ?? undefined,
       image_url: slide.image.url,
       font: slide.settings.font,
       theme: slide.settings.theme,

@@ -188,9 +188,9 @@ const styles = {
 };
 
 export default function SlideLightbox({ slide, slides = [], onClose, onNavigate }: SlideLightboxProps) {
-  const { addSlide, hasSlide } = useGallery();
+  const { addSlide, hasItem } = useGallery();
   
-  const isInGallery = slide ? hasSlide(slide.slide_id) : false;
+  const isInGallery = slide ? hasItem(slide.slide_id) : false;
   const currentIndex = slide ? slides.findIndex(s => s.slide_id === slide.slide_id) : -1;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < slides.length - 1;
