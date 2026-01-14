@@ -83,11 +83,10 @@ jobs:
 
       - name: Setup GCS credentials on VM
         run: |
-          gcloud compute ssh ${{ env.VM_NAME }} --zone=${{ env.ZONE }} --command="
-            cat > ~/philosophy_video_generator/gcs-credentials.json << 'EOF'
-          ${{ secrets.GCS_SERVICE_ACCOUNT_KEY }}
-          EOF
-          "
+          # Write credentials to temp file locally, then copy to VM
+          echo '${{ secrets.GCS_SERVICE_ACCOUNT_KEY }}' > /tmp/gcs-credentials.json
+          gcloud compute scp --zone=${{ env.ZONE }} /tmp/gcs-credentials.json ${{ env.VM_NAME }}:~/philosophy_video_generator/gcs-credentials.json
+          rm /tmp/gcs-credentials.json
 
       - name: Build and run new container
         run: |
