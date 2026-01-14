@@ -728,22 +728,10 @@ python tiktok_cli.py status --publish-id "PUBLISH_ID"
 python tiktok_cli.py info
 ```
 
-### Frontend Deployment (Vercel)
-The React frontend is deployed on Vercel at `https://app.cofndrly.com`.
-
-**Vercel Project**: `frontend` under `sharozs-projects-b7468887`
-**Environment Variable**: `VITE_API_URL=https://api.cofndrly.com`
-
-Deploy commands:
-```bash
-cd frontend
-npx vercel --prod      # Deploy to production
-npx vercel env ls      # List environment variables
-npx vercel logs        # View deployment logs
-```
-
-**DNS Setup Required** (GoDaddy):
-Add an A record: `app.cofndrly.com` → `76.76.21.21` (Vercel's IP)
+### Frontend (Vercel) - Quick Reference
+- **URL:** `https://app.cofndrly.com`
+- **Login:** Username `sharoz75`, Password `rosebud`
+- **Auto-deploys** on `git push origin main` (see CI/CD section below)
 
 ### Automation Scheduler
 The backend includes APScheduler for running automations:
@@ -782,8 +770,87 @@ PUT /api/automations/{id}/tiktok-settings
 **Enable TikTok auto-posting:**
 Set `post_to_tiktok: true` in automation settings to automatically post slideshows.
 
-### GitHub Actions Deployment
-The project uses GitHub Actions for automated deployment. See `.github/workflows/deploy.yml`.
+### CI/CD Pipeline (Auto-Deploy on Git Push)
+
+The project has fully automated CI/CD - pushing to `main` deploys both frontend and backend:
+
+| Component | Platform | URL | Trigger |
+|-----------|----------|-----|---------|
+| **Backend** | GCP VM | `https://api.cofndrly.com` | GitHub Actions |
+| **Frontend** | Vercel | `https://app.cofndrly.com` | Vercel Git Integration |
+
+**Workflow:**
+```
+git push origin main
+    │
+    ├──► GitHub Actions (.github/workflows/deploy.yml)
+    │       └── SSH into GCP VM → git pull → restart uvicorn
+    │
+    └──► Vercel (auto-triggered)
+            └── Build from frontend/ directory → deploy to CDN
+```
+
+#### Backend Deployment (GitHub Actions → GCP)
+
+**File:** `.github/workflows/deploy.yml`
+
+**What it does:**
+1. SSHs into `philosophy-bot-vm` on GCP
+2. Pulls latest code from GitHub
+3. Installs any new Python dependencies
+4. Restarts the uvicorn server
+
+**Required GitHub Secrets:**
+- `GCP_SSH_KEY` - Private SSH key for the VM
+- `GCP_VM_IP` - External IP of the VM (23.251.149.244)
+
+**Manual deploy (if needed):**
+```bash
+gcloud compute ssh philosophy-bot-vm --zone=us-central1-a --command="cd /home/runner/philosophy_video_generator && git pull && pip install -r requirements.txt && sudo systemctl restart philosophy-backend"
+```
+
+#### Frontend Deployment (Vercel)
+
+**Vercel Project:** `frontend` under `sharozs-projects-b7468887`
+**Root Directory:** `frontend` (set in Vercel dashboard)
+**Framework:** Vite
+**Build Command:** `npm run build`
+**Output Directory:** `dist`
+
+**Environment Variables (set in Vercel dashboard):**
+- `VITE_API_URL=https://api.cofndrly.com`
+
+**Manual deploy (if needed):**
+```bash
+cd frontend
+npx vercel --prod
+```
+
+**Vercel CLI commands:**
+```bash
+npx vercel ls                    # List recent deployments
+npx vercel env ls                # List environment variables
+npx vercel logs <deployment-url> # View deployment logs
+npx vercel inspect <url>         # Inspect deployment details
+```
+
+#### Git Configuration
+
+**Important:** Use `sharoz75@gmail.com` as git author to avoid Vercel permission issues:
+```bash
+git config user.email "sharoz75@gmail.com"
+git config user.name "Sharoz Javaid"
+```
+
+#### Deployment Checklist
+
+Before pushing to production:
+1. ✅ Run `npm run build` in `frontend/` to check for TypeScript errors
+2. ✅ Test locally with `./dev.sh`
+3. ✅ Commit with descriptive message
+4. ✅ Push to main: `git push origin main`
+5. ✅ Monitor GitHub Actions: `gh run list --limit 3`
+6. ✅ Monitor Vercel: `cd frontend && npx vercel ls`
 
 ## AI Agent & Gallery System
 
