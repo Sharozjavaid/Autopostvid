@@ -50,11 +50,14 @@ jobs:
           EOF
           "
 
-      - name: Stop existing container
+      - name: Stop existing container and cleanup old images
         run: |
           gcloud compute ssh ${{ env.VM_NAME }} --zone=${{ env.ZONE }} --command="
             sudo docker stop philosophy-agent 2>/dev/null || true
             sudo docker rm philosophy-agent 2>/dev/null || true
+            # Remove old images to save disk space
+            sudo docker image prune -af 2>/dev/null || true
+            sudo docker container prune -f 2>/dev/null || true
           "
 
       - name: Copy project files to VM
@@ -91,7 +94,7 @@ jobs:
               ${{ env.IMAGE_NAME }}
           "
 
-      - name: Verify deployment
+      - name: Verify deployment and final cleanup
         run: |
           echo "🚀 Deployment complete!"
           EXTERNAL_IP=$(gcloud compute instances describe ${{ env.VM_NAME }} --zone=${{ env.ZONE }} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
@@ -100,9 +103,20 @@ jobs:
           # Wait for container to start
           sleep 10
           
-          # Check if container is running
+          # Check if container is running and do final cleanup
           gcloud compute ssh ${{ env.VM_NAME }} --zone=${{ env.ZONE }} --command="
             sudo docker ps | grep philosophy-agent && echo '✅ Container is running' || echo '❌ Container not running'
+            
+            # Final cleanup - remove dangling images and build cache
+            echo '🧹 Cleaning up unused Docker resources...'
+            sudo docker image prune -f 2>/dev/null || true
+            sudo docker builder prune -f 2>/dev/null || true
+            
+            # Show disk usage
+            echo '💾 Current disk usage:'
+            df -h / | tail -1
+            echo '🐳 Docker disk usage:'
+            sudo docker system df
           "
 
       - name: Post deployment summary
