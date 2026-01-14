@@ -13,8 +13,16 @@ export const api = axios.create({
 export const apiClient = api;
 
 // Helper to get static image URLs
+// Handles both GCS URLs (https://storage.googleapis.com/...) and local paths
 export const getSlideImageUrl = (imagePath: string | null, cacheBuster?: number): string | null => {
   if (!imagePath) return null;
+  
+  // If it's already a full URL (GCS or any https), use it directly
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return cacheBuster ? `${imagePath}?t=${cacheBuster}` : imagePath;
+  }
+  
+  // Otherwise, it's a local path - build the static URL
   const filename = imagePath.split('/').pop();
   const url = `${API_BASE_URL}/static/slides/${filename}`;
   return cacheBuster ? `${url}?t=${cacheBuster}` : url;
@@ -22,6 +30,13 @@ export const getSlideImageUrl = (imagePath: string | null, cacheBuster?: number)
 
 export const getBackgroundImageUrl = (imagePath: string | null): string | null => {
   if (!imagePath) return null;
+  
+  // If it's already a full URL (GCS or any https), use it directly
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  
+  // Otherwise, it's a local path - build the static URL
   const filename = imagePath.split('/').pop();
   return `${API_BASE_URL}/static/images/${filename}`;
 };
@@ -452,6 +467,52 @@ export const removeAutomationTopic = async (automationId: string, topicIndex: nu
 
 export const reorderAutomationTopics = async (automationId: string, topics: string[]) => {
   const response = await api.put(`/api/automations/${automationId}/topics/reorder`, { topics });
+  return response.data;
+};
+
+// Automation Run History
+export interface AutomationRun {
+  id: string;
+  automation_id: string;
+  topic: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'posted';
+  started_at: string | null;
+  completed_at: string | null;
+  duration_seconds: number | null;
+  project_id: string | null;
+  slides_count: number;
+  image_paths: string[];
+  script_path: string | null;
+  tiktok_posted: boolean;
+  tiktok_publish_id: string | null;
+  tiktok_post_status: 'pending' | 'processing' | 'success' | 'failed' | null;
+  tiktok_error: string | null;
+  error_message: string | null;
+  settings_used: Record<string, unknown>;
+  created_at: string | null;
+}
+
+export const getAutomationRuns = async (
+  automationId: string,
+  limit: number = 20
+): Promise<{ automation_id: string; runs: AutomationRun[]; total: number }> => {
+  const response = await api.get(`/api/automations/${automationId}/runs`, { params: { limit } });
+  return response.data;
+};
+
+export const getAutomationRun = async (
+  automationId: string,
+  runId: string
+): Promise<AutomationRun> => {
+  const response = await api.get(`/api/automations/${automationId}/runs/${runId}`);
+  return response.data;
+};
+
+export const retryTikTokPost = async (
+  automationId: string,
+  runId: string
+): Promise<{ success: boolean; message?: string; error?: string; hint?: string; publish_id?: string }> => {
+  const response = await api.post(`/api/automations/${automationId}/runs/${runId}/retry-tiktok`);
   return response.data;
 };
 

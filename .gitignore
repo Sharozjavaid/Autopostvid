@@ -7,6 +7,8 @@
 # API keys and secrets
 *.key
 secrets/
+gcs-credentials.json
+*-credentials.json
 
 # Generated content
 generated_images/

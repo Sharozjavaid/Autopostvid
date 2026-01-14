@@ -140,6 +140,34 @@ async def health_check():
     }
 
 
+@app.get("/api/storage/stats")
+async def get_storage_stats():
+    """Get cloud storage statistics - see all stored content."""
+    from .services.cloud_storage import get_storage_service
+    
+    storage = get_storage_service()
+    stats = storage.get_storage_stats()
+    
+    return stats
+
+
+@app.get("/api/storage/list/{folder}")
+async def list_storage_folder(folder: str, limit: int = 50):
+    """List files in a specific storage folder (images, slides, backgrounds, etc.)."""
+    from .services.cloud_storage import get_storage_service
+    
+    storage = get_storage_service()
+    if not storage.is_available:
+        return {"error": "Cloud storage not configured", "files": []}
+    
+    files = storage.list_files(prefix=folder)
+    return {
+        "folder": folder,
+        "total": len(files),
+        "files": files[:limit]
+    }
+
+
 @app.get("/api/settings/models")
 async def get_available_models():
     """Get available image and voice models."""

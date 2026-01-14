@@ -58,6 +58,24 @@ When working on specific areas, apply these specialized knowledge patterns:
 3. Font config is in BOTH `text_overlay.py` files (root + backend)
 4. Theme prompts are in `theme_config.py`
 5. Always generate background first, then apply text
+6. **Images are uploaded to GCS** - see Cloud Storage section
+
+### ☁️ Cloud Storage Agent
+**Trigger**: Work on file storage, image persistence, or cloud infrastructure.
+
+**Key Knowledge**:
+1. All generated images upload to **Google Cloud Storage** bucket: `philosophy-content-storage`
+2. Public URLs: `https://storage.googleapis.com/philosophy-content-storage/...`
+3. Service: `backend/app/services/cloud_storage.py`
+4. Credentials file: `gcs-credentials.json` (gitignored)
+5. Database stores GCS URLs instead of local paths
+6. Frontend `getSlideImageUrl()` handles both GCS and local URLs automatically
+
+**Folder Structure in GCS:**
+- `backgrounds/` - AI-generated background images
+- `slides/` - Final slides with text overlay
+- `scripts/` - Generated scripts (if stored)
+- `test/` - Test uploads
 
 ## Directory Structure
 ```

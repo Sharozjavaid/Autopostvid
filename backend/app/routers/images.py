@@ -13,6 +13,7 @@ from ..schemas import ImageGenerateRequest, ImageGenerateResponse, ImageBatchGen
 from ..config import get_settings
 from ..websocket.progress import manager
 from ..services.prompt_config import get_image_prompt, IMAGE_STYLES
+from ..services.cloud_storage import get_storage_service
 
 # Add parent dir to path for theme_config
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
@@ -152,7 +153,13 @@ AVOID: {image_config.negative_prompt}"""
         if not background_path:
             raise Exception("Background generation returned no result")
 
-        slide.background_image_path = background_path
+        # Upload background to GCS for persistence
+        storage = get_storage_service()
+        if storage.is_available:
+            bg_url = storage.upload_file(background_path, "backgrounds")
+            slide.background_image_path = bg_url if bg_url else background_path
+        else:
+            slide.background_image_path = background_path
 
         # Apply programmatic text overlay using Pillow
         overlay = get_text_overlay()
@@ -212,29 +219,44 @@ AVOID: {image_config.negative_prompt}"""
             theme=theme_id
         )
         
+        # Upload final image to GCS for persistence
+        if storage.is_available:
+            final_url = storage.upload_file(final_path, "slides")
+            slide.final_image_path = final_url if final_url else final_path
+        else:
+            slide.final_image_path = final_path
+        
         # Update slide
-        slide.final_image_path = final_path
         slide.current_font = effective_font
         slide.current_theme = theme_id
         slide.image_status = "complete"
         slide.error_message = None
         db.commit()
 
-        # Broadcast success
+        # Broadcast success - use GCS URL if available
+        image_url = slide.final_image_path
+        if not image_url.startswith("http"):
+            image_url = f"/static/slides/{Path(slide.final_image_path).name}"
+        
         if project_id:
             await manager.send_progress(project_id, {
                 "type": "slide_complete",
                 "slide_id": slide.id,
                 "slide_index": slide.order_index,
-                "image_url": f"/static/slides/{Path(slide.final_image_path).name}",
+                "image_url": image_url,
                 "version": version.version_number
             })
 
+        # Return URLs - use GCS URLs if available
+        bg_url = slide.background_image_path
+        if not bg_url.startswith("http"):
+            bg_url = f"/static/images/{Path(background_path).name}"
+        
         return ImageGenerateResponse(
             slide_id=slide.id,
             status="success",
-            background_image_url=f"/static/images/{Path(background_path).name}",
-            final_image_url=f"/static/slides/{Path(final_path).name}"
+            background_image_url=bg_url,
+            final_image_url=image_url
         )
 
     except Exception as e:
@@ -479,18 +501,30 @@ async def reapply_text_overlay(
             theme=slide.current_theme
         )
         
+        # Upload to GCS for persistence
+        storage = get_storage_service()
+        if storage.is_available:
+            final_url = storage.upload_file(final_path, "slides")
+            slide.final_image_path = final_url if final_url else final_path
+        else:
+            slide.final_image_path = final_path
+        
         # Update slide with new values
-        slide.final_image_path = final_path
         slide.current_font = font
         slide.image_status = "complete"
         slide.error_message = None
         db.commit()
         
+        # Return URL - use GCS URL if available
+        image_url = slide.final_image_path
+        if not image_url.startswith("http"):
+            image_url = f"/static/slides/{Path(final_path).name}"
+        
         return {
             "success": True,
             "slide_id": slide.id,
             "font": font,
-            "final_image_url": f"/static/slides/{Path(final_path).name}",
+            "final_image_url": image_url,
             "message": f"Text re-applied with {font} font",
             "version": version.version_number
         }

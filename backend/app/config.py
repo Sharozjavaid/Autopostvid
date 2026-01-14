@@ -25,12 +25,42 @@ CLAUDE_MAX_TOKENS = 16384
 CLAUDE_MAX_ITERATIONS = 25
 
 
+# =============================================================================
+# ENVIRONMENT DETECTION
+# =============================================================================
+def is_production() -> bool:
+    """Detect if running in production (GCP VM) vs local development."""
+    # Check for explicit environment variable first
+    env = os.environ.get("ENVIRONMENT", "").lower()
+    if env in ("production", "prod"):
+        return True
+    if env in ("development", "dev", "local"):
+        return False
+    
+    # Auto-detect: Check if running on GCP VM
+    # The VM has the code at /home/runner/philosophy_video_generator
+    gcp_path = Path("/home/runner/philosophy_video_generator")
+    if gcp_path.exists():
+        return True
+    
+    # Check for GCS credentials file (production has it)
+    if Path("/home/runner/philosophy_video_generator/gcs-credentials.json").exists():
+        return True
+    
+    # Default to development
+    return False
+
+
+# Export for use in other modules
+IS_PRODUCTION = is_production()
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # App settings
     app_name: str = "Philosophy Video Generator API"
-    debug: bool = True
+    debug: bool = not IS_PRODUCTION  # Debug off in production
 
     # Database
     database_url: str = "sqlite:///./philosophy_generator.db"
