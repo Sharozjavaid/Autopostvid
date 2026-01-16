@@ -122,8 +122,13 @@ async def get_reference_frame(ref_id: str, frame_index: int):
         raise HTTPException(status_code=404, detail="Frame not found")
 
     frame_path = ref["frames"][frame_index]
+
+    # If path is relative, make it absolute using reference_scraper's base dir
+    if not os.path.isabs(frame_path):
+        frame_path = str(reference_scraper._SCRIPT_DIR / frame_path)
+
     if not os.path.exists(frame_path):
-        raise HTTPException(status_code=404, detail="Frame file not found")
+        raise HTTPException(status_code=404, detail=f"Frame file not found: {frame_path}")
 
     return FileResponse(frame_path, media_type="image/jpeg")
 

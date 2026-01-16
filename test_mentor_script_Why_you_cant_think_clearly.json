@@ -1,0 +1,163 @@
+{
+  "title": "Clear Your Mind",
+  "topic": "Why you can't think clearly",
+  "content_type": "mentor_slideshow",
+  "writing_style": "philosophical_mentor",
+  "total_slides": 7,
+  "slides": [
+    {
+      "slide_number": 1,
+      "slide_type": "hook",
+      "text_items": [
+        {
+          "text": "You are drowning in other people's noise.",
+          "font_size": "large",
+          "word_count": 7
+        }
+      ],
+      "visual_description": "A person underwater looking up at the distorted surface, chaotic bubbles representing thoughts, dark blue tones"
+    },
+    {
+      "slide_number": 2,
+      "slide_type": "content",
+      "text_items": [
+        {
+          "text": "You consume endless content but digest nothing.",
+          "font_size": "medium-large",
+          "word_count": 7
+        },
+        {
+          "label": "What it does:",
+          "text": "Creates severe mental indigestion.",
+          "font_size": "small",
+          "word_count": 4
+        },
+        {
+          "label": "Why it matters:",
+          "text": "True clarity needs silence, not another podcast. You are stuffing a full stomach.",
+          "font_size": "small",
+          "word_count": 13
+        }
+      ],
+      "visual_description": "Close up of eyes reflecting scrolling text or static, overwhelming information overload visually represented"
+    },
+    {
+      "slide_number": 3,
+      "slide_type": "content",
+      "text_items": [
+        {
+          "text": "You measure your worth by their highlight reel.",
+          "font_size": "medium-large",
+          "word_count": 8
+        },
+        {
+          "label": "What it does:",
+          "text": "Feeds your insecurity loop.",
+          "font_size": "small",
+          "word_count": 4
+        },
+        {
+          "label": "Why it matters:",
+          "text": "When you look at them, you ignore you. Comparison is the thief of focus.",
+          "font_size": "small",
+          "word_count": 14
+        }
+      ],
+      "visual_description": "A person looking at a mirror but seeing someone else's perfect reflection, moody lighting"
+    },
+    {
+      "slide_number": 4,
+      "slide_type": "content",
+      "text_items": [
+        {
+          "text": "You mistake anxiety for actual deep thinking.",
+          "font_size": "medium-large",
+          "word_count": 7
+        },
+        {
+          "label": "What it does:",
+          "text": "Traps you in fear circles.",
+          "font_size": "small",
+          "word_count": 5
+        },
+        {
+          "label": "Why it matters:",
+          "text": "Real thought solves problems. Worrying just pets the monster until it grows bigger.",
+          "font_size": "small",
+          "word_count": 13
+        }
+      ],
+      "visual_description": "A hamster wheel spinning in a dark void, symbolizing circular thinking without progress"
+    },
+    {
+      "slide_number": 5,
+      "slide_type": "content",
+      "text_items": [
+        {
+          "text": "You want to be right, not clear.",
+          "font_size": "medium-large",
+          "word_count": 7
+        },
+        {
+          "label": "What it does:",
+          "text": "Builds a fortress of ego.",
+          "font_size": "small",
+          "word_count": 5
+        },
+        {
+          "label": "Why it matters:",
+          "text": "A full cup cannot hold more water. You must let go to actually see.",
+          "font_size": "small",
+          "word_count": 14
+        }
+      ],
+      "visual_description": "A stone wall or fortress blocking a beautiful view, representing ego blocking truth"
+    },
+    {
+      "slide_number": 6,
+      "slide_type": "content",
+      "text_items": [
+        {
+          "text": "You are waiting for clarity before moving.",
+          "font_size": "medium-large",
+          "word_count": 7
+        },
+        {
+          "label": "What it does:",
+          "text": "Freezes you in place.",
+          "font_size": "small",
+          "word_count": 4
+        },
+        {
+          "label": "Why it matters:",
+          "text": "Clarity comes from doing, not sitting. You cannot steer a parked car.",
+          "font_size": "small",
+          "word_count": 12
+        }
+      ],
+      "visual_description": "A silhouette standing still in thick fog, taking one step forward to clear the path"
+    },
+    {
+      "slide_number": 7,
+      "slide_type": "outro",
+      "text_items": [
+        {
+          "text": "Is your mind a garden or a dumpster?",
+          "font_size": "medium",
+          "word_count": 8
+        },
+        {
+          "text": "Save this. Read it when the noise gets too loud.",
+          "font_size": "small",
+          "word_count": 10
+        },
+        {
+          "text": "Silence is not empty. It is full of answers.",
+          "font_size": "small",
+          "word_count": 9
+        }
+      ],
+      "visual_description": "A single peaceful tree growing in a clean, empty space, symbolizing a cleared mind"
+    }
+  ]
+}

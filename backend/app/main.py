@@ -11,7 +11,7 @@ from slowapi.errors import RateLimitExceeded
 
 from .config import get_settings, IS_PRODUCTION
 from .database import init_db
-from .routers import projects, scripts, slides, images, automations, tiktok, agent, gallery, inspiration
+from .routers import projects, scripts, slides, images, automations, tiktok, agent, gallery, inspiration, storage
 from .websocket.progress import router as ws_router
 from .middleware import (
     verify_api_key,
@@ -209,6 +209,11 @@ app.include_router(
 app.include_router(
     inspiration.router, 
     tags=["inspiration"],
+    dependencies=protected_routes
+)
+app.include_router(
+    storage.router, 
+    tags=["storage"],
     dependencies=protected_routes
 )
 app.include_router(ws_router, tags=["websocket"])  # WebSocket doesn't use HTTP auth

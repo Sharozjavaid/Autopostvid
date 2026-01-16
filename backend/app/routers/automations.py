@@ -664,6 +664,99 @@ async def get_automation_run(
     return run.to_dict()
 
 
+@router.post("/{automation_id}/runs/{run_id}/retry-tiktok")
+async def retry_tiktok_post(
+    automation_id: str,
+    run_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Retry posting a completed run to TikTok.
+    
+    Use this when a slideshow was generated successfully but TikTok posting failed
+    (e.g., due to rate limiting like spam_risk_too_many_pending_share).
+    
+    Note: TikTok allows max 5 pending drafts per 24 hours. If you get this error,
+    clear some drafts from your TikTok app first.
+    """
+    from ..models import AutomationRun
+    from ..services.tiktok_poster import TikTokPoster
+    
+    # Get the run
+    run = db.query(AutomationRun).filter(
+        AutomationRun.id == run_id,
+        AutomationRun.automation_id == automation_id
+    ).first()
+    
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    # Check that the run completed (has images to post)
+    if run.status not in ("completed", "posted"):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Run status is '{run.status}' - can only retry completed runs"
+        )
+    
+    if not run.image_paths or len(run.image_paths) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Run has no images to post (need at least 2 for slideshow)"
+        )
+    
+    # Already posted successfully?
+    if run.tiktok_posted and run.tiktok_post_status == "success":
+        return {
+            "success": True,
+            "message": "Already posted successfully",
+            "publish_id": run.tiktok_publish_id
+        }
+    
+    try:
+        poster = TikTokPoster()
+        
+        # Generate caption from topic
+        caption = f"{run.topic} #philosophy #stoicism #wisdom #motivation"
+        
+        # Attempt to post
+        result = poster.post_photo_slideshow(
+            image_paths=run.image_paths,
+            caption=caption
+        )
+        
+        if result.get("success"):
+            run.tiktok_posted = True
+            run.tiktok_publish_id = result.get("publish_id")
+            run.tiktok_post_status = "pending"  # TikTok is processing
+            run.tiktok_error = None
+            run.status = "posted"
+            db.commit()
+            
+            return {
+                "success": True,
+                "message": "Posted to TikTok drafts successfully",
+                "publish_id": result.get("publish_id"),
+                "image_count": result.get("image_count")
+            }
+        else:
+            error_msg = result.get("error", "Unknown error")
+            run.tiktok_post_status = "failed"
+            run.tiktok_error = error_msg
+            db.commit()
+            
+            return {
+                "success": False,
+                "error": error_msg,
+                "hint": "If you see 'spam_risk_too_many_pending_share', you have too many drafts. Open TikTok and publish/delete some drafts first."
+            }
+            
+    except Exception as e:
+        run.tiktok_post_status = "failed"
+        run.tiktok_error = str(e)
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"TikTok posting failed: {str(e)}")
+
+
 # =============================================================================
 # SCHEDULER STATUS
 # =============================================================================

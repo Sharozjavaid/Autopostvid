@@ -11,6 +11,7 @@ Provides:
 """
 
 import json
+import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -28,9 +29,26 @@ from ..schemas.agent import (
     ToolCall
 )
 from ..services.agent_service import get_agent_service
+from ..config import get_settings
 
-
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/agent", tags=["agent"])
+
+
+def verify_api_key_param(api_key: Optional[str]) -> bool:
+    """
+    Verify API key from query parameter.
+    Used for SSE endpoints where headers aren't available.
+    Returns True if valid or if auth is disabled.
+    """
+    settings = get_settings()
+    
+    # If no API key configured, auth is disabled
+    if not settings.api_key:
+        return True
+    
+    # Check the provided key
+    return api_key == settings.api_key
 
 
 @router.post("/chat", response_model=AgentChatResponse)
@@ -76,10 +94,13 @@ async def chat(request: AgentChatRequest):
 @router.get("/chat/stream")
 async def chat_stream(
     message: str = Query(..., description="User message"),
-    session_id: Optional[str] = Query(None, description="Session ID for continuity")
+    session_id: Optional[str] = Query(None, description="Session ID for continuity"),
+    api_key: Optional[str] = Query(None, description="API key (required if auth enabled)")
 ):
     """
     Streaming chat endpoint using Server-Sent Events (SSE).
+    
+    Note: API key must be passed as query param since EventSource doesn't support headers.
     
     Events:
     - session: {"session_id": "..."} - Session info
@@ -89,6 +110,10 @@ async def chat_stream(
     - done: {"iterations": N, "tool_count": M} - Response complete
     - error: {"message": "..."} - Error occurred
     """
+    # Verify API key for SSE endpoint
+    if not verify_api_key_param(api_key):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
     try:
         service = get_agent_service()
         

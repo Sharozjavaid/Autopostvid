@@ -2,15 +2,24 @@ import axios from 'axios';
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001';
 
+// API Key for authentication - loaded from environment variable
+const API_KEY = import.meta.env.VITE_API_KEY || '';
+
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    ...(API_KEY && { 'X-API-Key': API_KEY }),
   },
 });
 
 // Also export as apiClient for convenience
 export const apiClient = api;
+
+// Log warning in development if no API key is configured
+if (!API_KEY && import.meta.env.DEV) {
+  console.warn('[API Client] No VITE_API_KEY configured - API calls may fail if backend requires authentication');
+}
 
 // Helper to get static image URLs
 // Handles both GCS URLs (https://storage.googleapis.com/...) and local paths
@@ -625,6 +634,8 @@ export const streamAgentMessage = (
 ): (() => void) => {
   const params = new URLSearchParams({ message });
   if (sessionId) params.append('session_id', sessionId);
+  // Include API key in query params for SSE (EventSource doesn't support custom headers)
+  if (API_KEY) params.append('api_key', API_KEY);
   
   const eventSource = new EventSource(
     `${API_BASE_URL}/api/agent/chat/stream?${params.toString()}`
@@ -785,6 +796,70 @@ export const clearGallery = async (): Promise<{ success: boolean; deleted: numbe
 
 export const getGalleryStats = async (): Promise<GalleryStats> => {
   const response = await api.get('/api/gallery/stats/summary');
+  return response.data;
+};
+
+// ============================================================================
+// Cloud Storage API (Media Library)
+// ============================================================================
+
+export interface StorageItem {
+  name: string;
+  url: string;
+  size_bytes: number;
+  size_human: string;
+  content_type: string;
+  folder: string;
+  created_at: string | null;
+}
+
+export interface StorageListResponse {
+  items: StorageItem[];
+  total: number;
+  folder: string;
+}
+
+export interface StorageStats {
+  available: boolean;
+  bucket?: string;
+  total_files: number;
+  total_size_mb: number;
+  folders: Record<string, { count: number; size: number }>;
+  public_url?: string;
+  error?: string;
+}
+
+export const browseStorage = async (params?: {
+  folder?: string;
+  file_type?: 'video' | 'image' | 'audio';
+  limit?: number;
+}): Promise<StorageListResponse> => {
+  const response = await api.get('/api/storage/browse', { params });
+  return response.data;
+};
+
+export const getStorageVideos = async (limit?: number): Promise<StorageListResponse> => {
+  const response = await api.get('/api/storage/videos', { params: { limit } });
+  return response.data;
+};
+
+export const getStorageImages = async (limit?: number): Promise<StorageListResponse> => {
+  const response = await api.get('/api/storage/images', { params: { limit } });
+  return response.data;
+};
+
+export const getStorageSlides = async (limit?: number): Promise<StorageListResponse> => {
+  const response = await api.get('/api/storage/slides', { params: { limit } });
+  return response.data;
+};
+
+export const getStorageStats = async (): Promise<StorageStats> => {
+  const response = await api.get('/api/storage/stats');
+  return response.data;
+};
+
+export const getStorageFolders = async (): Promise<{ folders: string[]; bucket?: string; public_url?: string }> => {
+  const response = await api.get('/api/storage/folders');
   return response.data;
 };
 

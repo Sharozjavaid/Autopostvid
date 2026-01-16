@@ -51,6 +51,33 @@ const getTikTokStatus = async () => {
   return response.data;
 };
 
+// Instagram post function
+const postToInstagram = async (projectId: string, caption?: string, hashtags?: string[]): Promise<{
+  success: boolean;
+  post_id?: string;
+  error?: string;
+  image_count?: number;
+  instagram_url?: string;
+  status?: string;
+}> => {
+  const response = await api.post(`/api/projects/${projectId}/post-to-instagram`, {
+    caption,
+    hashtags
+  });
+  return response.data;
+};
+
+// Check Instagram status
+const getInstagramStatus = async () => {
+  try {
+    const response = await api.get('/api/instagram/status');
+    return response.data;
+  } catch {
+    // If endpoint doesn't exist, assume connected (Post Bridge doesn't need auth check)
+    return { connected: true };
+  }
+};
+
 export default function CompletedProjectView() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -62,6 +89,12 @@ export default function CompletedProjectView() {
   const [showTikTokModal, setShowTikTokModal] = useState(false);
   const [tiktokCaption, setTiktokCaption] = useState('');
   const [postResult, setPostResult] = useState<{ success: boolean; message: string } | null>(null);
+  
+  // Instagram state
+  const [showInstagramModal, setShowInstagramModal] = useState(false);
+  const [instagramCaption, setInstagramCaption] = useState('');
+  const [instagramHashtags, setInstagramHashtags] = useState('');
+  const [instagramPostResult, setInstagramPostResult] = useState<{ success: boolean; message: string; url?: string } | null>(null);
 
   // Fetch project data
   const { data: project, isLoading, error } = useQuery({
@@ -89,6 +122,48 @@ export default function CompletedProjectView() {
     },
     onError: (error: Error) => {
       setPostResult({ success: false, message: error.message });
+    },
+  });
+  
+  // Fetch Instagram status (just to show connected)
+  const { data: instagramStatus } = useQuery({
+    queryKey: ['instagram-status'],
+    queryFn: getInstagramStatus,
+    staleTime: 60000,
+  });
+  
+  // Post to Instagram mutation
+  const postToInstagramMutation = useMutation({
+    mutationFn: () => {
+      const caption = instagramCaption || project?.topic || 'Philosophy Slideshow';
+      // Parse hashtags from comma-separated string, always include philosophizemeapp
+      let hashtags = instagramHashtags
+        .split(',')
+        .map(h => h.trim().replace(/^#/, ''))
+        .filter(h => h.length > 0);
+      // Always include philosophizemeapp first
+      if (!hashtags.includes('philosophizemeapp')) {
+        hashtags = ['philosophizemeapp', ...hashtags];
+      }
+      if (hashtags.length === 1) {
+        // Add some default hashtags if only our required one
+        hashtags = ['philosophizemeapp', 'philosophy', 'wisdom', 'stoicism', 'motivation'];
+      }
+      return postToInstagram(projectId!, caption, hashtags);
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        setInstagramPostResult({ 
+          success: true, 
+          message: `Carousel with ${data.image_count} images posted to Instagram!`,
+          url: data.instagram_url
+        });
+      } else {
+        setInstagramPostResult({ success: false, message: data.error || 'Failed to post to Instagram' });
+      }
+    },
+    onError: (error: Error) => {
+      setInstagramPostResult({ success: false, message: error.message });
     },
   });
 
@@ -145,6 +220,17 @@ export default function CompletedProjectView() {
   const confirmTikTokPost = () => {
     setPostResult(null);
     postToTikTokMutation.mutate();
+  };
+  
+  const handlePostToInstagram = () => {
+    setInstagramCaption(project?.topic || project?.name || '');
+    setInstagramHashtags('philosophizemeapp, philosophy, wisdom, stoicism, motivation');
+    setShowInstagramModal(true);
+  };
+  
+  const confirmInstagramPost = () => {
+    setInstagramPostResult(null);
+    postToInstagramMutation.mutate();
   };
 
   return (
@@ -217,12 +303,21 @@ export default function CompletedProjectView() {
             Edit Project
           </Button>
           <Button
-            variant="primary"
+            variant="secondary"
             icon={<Send size={18} />}
             onClick={handlePostToTikTok}
             disabled={!allImagesComplete}
           >
             Post to TikTok
+          </Button>
+          <Button
+            variant="primary"
+            icon={<Send size={18} />}
+            onClick={handlePostToInstagram}
+            disabled={!allImagesComplete}
+            style={{ background: 'linear-gradient(135deg, #833AB4 0%, #FD1D1D 50%, #FCB045 100%)' }}
+          >
+            Post to Instagram
           </Button>
         </div>
       </div>
@@ -610,13 +705,22 @@ export default function CompletedProjectView() {
                 Preview Slideshow
               </Button>
               <Button
-                variant="primary"
+                variant="secondary"
                 fullWidth
                 icon={<Send size={18} />}
                 onClick={handlePostToTikTok}
                 disabled={!allImagesComplete}
               >
                 Post to TikTok
+              </Button>
+              <Button
+                variant="primary"
+                fullWidth
+                icon={<Send size={18} />}
+                onClick={handlePostToInstagram}
+                disabled={!allImagesComplete}
+              >
+                Post to Instagram
               </Button>
             </div>
           </GlassCard>
@@ -650,6 +754,42 @@ export default function CompletedProjectView() {
                       style={{ fontSize: '12px', color: '#667eea', display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
                       Connect Account <ExternalLink size={12} />
+                    </a>
+                  </div>
+                </>
+              )}
+            </div>
+          </GlassCard>
+          
+          {/* Instagram Status */}
+          <GlassCard gradient={instagramStatus?.connected ? 'green' : 'orange'} padding="md">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {instagramStatus?.connected ? (
+                <>
+                  <CheckCircle2 size={20} style={{ color: '#16a34a' }} />
+                  <div>
+                    <p style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>
+                      Instagram Connected
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#64748b' }}>
+                      via Post Bridge
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <AlertCircle size={20} style={{ color: '#d97706' }} />
+                  <div>
+                    <p style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>
+                      Instagram Not Connected
+                    </p>
+                    <a
+                      href="https://post-bridge.com/dashboard"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: '12px', color: '#667eea', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      Connect via Post Bridge <ExternalLink size={12} />
                     </a>
                   </div>
                 </>
@@ -792,6 +932,212 @@ export default function CompletedProjectView() {
                       icon={<Send size={18} />}
                     >
                       Send to Drafts
+                    </Button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Instagram Post Modal */}
+      <AnimatePresence>
+        {showInstagramModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 100,
+              backdropFilter: 'blur(4px)',
+            }}
+            onClick={() => !postToInstagramMutation.isPending && setShowInstagramModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              style={{
+                background: 'white',
+                borderRadius: '24px',
+                padding: '32px',
+                width: '100%',
+                maxWidth: '520px',
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                <h2 style={{ 
+                  fontSize: '20px', 
+                  fontWeight: 700, 
+                  background: 'linear-gradient(135deg, #833AB4 0%, #FD1D1D 50%, #FCB045 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
+                }}>
+                  Post to Instagram
+                </h2>
+                <button
+                  onClick={() => setShowInstagramModal(false)}
+                  disabled={postToInstagramMutation.isPending}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#94a3b8',
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {instagramPostResult ? (
+                <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                  <div style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '20px',
+                    background: instagramPostResult.success ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 16px',
+                  }}>
+                    {instagramPostResult.success ? (
+                      <CheckCircle2 size={32} style={{ color: '#22c55e' }} />
+                    ) : (
+                      <AlertCircle size={32} style={{ color: '#ef4444' }} />
+                    )}
+                  </div>
+                  <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>
+                    {instagramPostResult.success ? 'Posted to Instagram!' : 'Failed to Post'}
+                  </h3>
+                  <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>
+                    {instagramPostResult.message}
+                  </p>
+                  {instagramPostResult.url && (
+                    <a
+                      href={instagramPostResult.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '6px',
+                        fontSize: '14px', 
+                        color: '#833AB4', 
+                        marginBottom: '16px',
+                        textDecoration: 'none'
+                      }}
+                    >
+                      View on Instagram <ExternalLink size={14} />
+                    </a>
+                  )}
+                  <div>
+                    <Button variant="primary" onClick={() => setShowInstagramModal(false)}>
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>
+                      Caption
+                    </label>
+                    <textarea
+                      className="textarea"
+                      value={instagramCaption}
+                      onChange={(e) => setInstagramCaption(e.target.value)}
+                      placeholder="Enter a caption for your Instagram post..."
+                      rows={3}
+                    />
+                  </div>
+                  
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>
+                      Hashtags
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={instagramHashtags}
+                      onChange={(e) => setInstagramHashtags(e.target.value)}
+                      placeholder="philosophy, wisdom, stoicism"
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(148, 163, 184, 0.3)',
+                        fontSize: '14px',
+                        background: 'rgba(248, 250, 252, 0.5)',
+                      }}
+                    />
+                    <p style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
+                      Comma-separated hashtags. <strong>#philosophizemeapp</strong> is always included automatically.
+                    </p>
+                  </div>
+
+                  <div style={{
+                    padding: '16px',
+                    background: 'linear-gradient(135deg, rgba(131, 58, 180, 0.05) 0%, rgba(253, 29, 29, 0.05) 50%, rgba(252, 176, 69, 0.05) 100%)',
+                    borderRadius: '12px',
+                    marginBottom: '24px',
+                    border: '1px solid rgba(131, 58, 180, 0.1)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <ImageIcon size={20} style={{ color: '#833AB4' }} />
+                      <div>
+                        <p style={{ fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>
+                          {Math.min(completedSlides.length, 10)} images ready
+                        </p>
+                        <p style={{ fontSize: '12px', color: '#64748b' }}>
+                          Will be posted as a carousel (max 10 images)
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div style={{
+                    padding: '12px 16px',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    borderRadius: '10px',
+                    marginBottom: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}>
+                    <AlertCircle size={18} style={{ color: '#d97706', flexShrink: 0 }} />
+                    <p style={{ fontSize: '13px', color: '#92400e' }}>
+                      This will post directly to Instagram (not to drafts).
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <Button
+                      variant="secondary"
+                      fullWidth
+                      onClick={() => setShowInstagramModal(false)}
+                      disabled={postToInstagramMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      onClick={confirmInstagramPost}
+                      loading={postToInstagramMutation.isPending}
+                      icon={<Send size={18} />}
+                    >
+                      Post Now
                     </Button>
                   </div>
                 </>

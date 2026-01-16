@@ -69,12 +69,17 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite:///./philosophy_generator.db"
 
-    # API Keys
+    # API Keys - External Services
     google_api_key: str = ""
     elevenlabs_api_key: str = ""
     fal_key: str = ""
     openai_api_key: str = ""
     anthropic_api_key: str = ""
+    
+    # API Security - Authentication key for protected endpoints
+    # Set this in .env to enable API key authentication
+    # If not set, authentication is disabled (development mode)
+    api_key: str = ""
 
     # File paths - resolve base_dir dynamically to work in both local and Docker
     # Local: backend/app/config.py -> 4 parents -> philosophy_video_generator/
@@ -101,6 +106,7 @@ class Settings(BaseSettings):
         return self.base_dir / "generated_slides"
 
     # CORS - allow localhost for dev, Vercel for production
+    # SECURITY: Removed "*" wildcard - only allow specific origins
     cors_origins: list[str] = [
         # Local development
         "http://localhost:3000",
@@ -112,12 +118,9 @@ class Settings(BaseSettings):
         # Production - Vercel
         "https://app.cofndrly.com",
         "https://frontend-lyart-ten-67.vercel.app",
-        "https://*.vercel.app",
-        # GCP VM direct
+        # GCP VM direct access (if needed for testing)
         "http://23.251.149.244:8501",
         "http://23.251.149.244:8001",
-        "http://23.251.149.244",
-        "*",  # Allow all origins for now (can restrict later)
     ]
 
     class Config:

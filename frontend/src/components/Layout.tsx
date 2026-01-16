@@ -15,12 +15,14 @@ import {
   LogOut,
   Bot,
   Lightbulb,
+  HardDrive,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
   { to: '/', icon: LayoutGrid, label: 'Dashboard', description: 'Overview & quick actions' },
   { to: '/agent', icon: Bot, label: 'AI Agent', description: 'Claude-powered assistant', featured: true },
+  { to: '/media', icon: HardDrive, label: 'Media Library', description: 'All videos & images' },
   { to: '/inspiration', icon: Lightbulb, label: 'Inspiration', description: 'Reference examples' },
   { to: '/projects', icon: FolderOpen, label: 'Projects', description: 'All your creations' },
   { to: '/script-generator', icon: FileText, label: 'Script Generator', description: 'AI-powered scripts' },

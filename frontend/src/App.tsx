@@ -16,6 +16,7 @@ import Settings from './pages/Settings';
 import Agent from './pages/Agent';
 import CompletedProjectView from './pages/CompletedProjectView';
 import Inspiration from './pages/Inspiration';
+import MediaLibrary from './pages/MediaLibrary';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,6 +56,7 @@ function App() {
                 <Route path="settings" element={<Settings />} />
                 <Route path="agent" element={<Agent />} />
                 <Route path="inspiration" element={<Inspiration />} />
+                <Route path="media" element={<MediaLibrary />} />
               </Route>
             </Routes>
           </BrowserRouter>

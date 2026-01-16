@@ -4,7 +4,7 @@
 This is a full-stack application for generating AI-powered philosophy-themed slideshows and videos.
 - **Backend**: FastAPI + SQLAlchemy + SQLite (Python 3.11+)
 - **Frontend**: React + TypeScript + Vite + TanStack Query
-- **AI Services**: OpenAI GPT-4, Gemini, ElevenLabs, fal.ai
+- **AI Services**: OpenAI GPT-4, Gemini, ElevenLabs, fal.ai, Anthropic
 
 ## Directory Structure
 ```

@@ -462,6 +462,78 @@ IMPORTANT: Images must be JPEG format - the system automatically handles this co
     },
 
     # -------------------------------------------------------------------------
+    # INSTAGRAM TOOLS (via Post Bridge API)
+    # -------------------------------------------------------------------------
+    {
+        "name": "check_instagram_status",
+        "description": """Check if Instagram is connected via Post Bridge API.
+
+USE THIS WHEN: User asks about Instagram connection or before posting to Instagram.
+RETURNS: Connection status and account info if connected.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {}
+        },
+        "category": "instagram"
+    },
+    {
+        "name": "post_slideshow_to_instagram",
+        "description": """Post a photo carousel/slideshow to Instagram.
+
+USE THIS WHEN: User wants to post generated slides to Instagram as a carousel/slideshow.
+REQUIRES: 
+- Instagram connected via Post Bridge (check with check_instagram_status first)
+- Project must have completed images (at least 2 slides with final_image_path)
+
+HOW IT WORKS:
+1. Takes a project_id and gets all slides with completed images
+2. Uploads images to Post Bridge
+3. Creates a carousel post on Instagram
+4. Returns the Instagram post URL when complete
+
+NOTE: This posts directly to Instagram (not drafts). Images appear as swipeable carousel.
+HASHTAGS: Optional array of hashtags (without #) - e.g., ["philosophy", "wisdom", "stoicism"]""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project_id": {
+                    "type": "string",
+                    "description": "The project ID containing the slides to post"
+                },
+                "caption": {
+                    "type": "string",
+                    "description": "Caption for the Instagram post (optional, defaults to project topic)"
+                },
+                "hashtags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Hashtags to add (without #). E.g., ['philosophy', 'wisdom']"
+                }
+            },
+            "required": ["project_id"]
+        },
+        "category": "instagram"
+    },
+    {
+        "name": "get_instagram_post_status",
+        "description": """Check the status of an Instagram post.
+
+USE THIS WHEN: User wants to check if their Instagram post succeeded.
+RETURNS: Post status and URL if published.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "post_id": {
+                    "type": "string",
+                    "description": "The post ID from post_slideshow_to_instagram"
+                }
+            },
+            "required": ["post_id"]
+        },
+        "category": "instagram"
+    },
+
+    # -------------------------------------------------------------------------
     # AUTOMATION TOOLS
     # -------------------------------------------------------------------------
     {
@@ -821,6 +893,10 @@ class ToolExecutor:
             "upload_to_tiktok": self._upload_to_tiktok,
             "get_upload_status": self._get_upload_status,
             "post_slideshow_to_tiktok": self._post_slideshow_to_tiktok,
+            # Instagram tools
+            "check_instagram_status": self._check_instagram_status,
+            "post_slideshow_to_instagram": self._post_slideshow_to_instagram,
+            "get_instagram_post_status": self._get_instagram_post_status,
             # Automation tools
             "list_automations": self._list_automations,
             "create_automation": self._create_automation,
@@ -1730,6 +1806,158 @@ class ToolExecutor:
             return {"success": False, "error": f"Failed to post slideshow: {str(e)}"}
         finally:
             db.close()
+    
+    # -------------------------------------------------------------------------
+    # INSTAGRAM TOOL IMPLEMENTATIONS
+    # -------------------------------------------------------------------------
+    
+    async def _check_instagram_status(self) -> Dict[str, Any]:
+        """Check Instagram connection status via Post Bridge."""
+        from .instagram_poster import InstagramPoster
+        
+        try:
+            poster = InstagramPoster()
+            result = poster.check_connection()
+            
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "connected": True,
+                    "username": result.get("username"),
+                    "account_id": result.get("account_id"),
+                    "platform": "instagram",
+                    "service": "Post Bridge"
+                }
+            else:
+                return {
+                    "success": False,
+                    "connected": False,
+                    "error": result.get("error"),
+                    "hint": result.get("hint", "Connect your Instagram at https://post-bridge.com/dashboard")
+                }
+        except Exception as e:
+            return {"success": False, "error": f"Failed to check Instagram status: {str(e)}"}
+    
+    async def _post_slideshow_to_instagram(
+        self,
+        project_id: str,
+        caption: str = None,
+        hashtags: List[str] = None
+    ) -> Dict[str, Any]:
+        """Post project slides as a carousel to Instagram."""
+        from .instagram_poster import InstagramPoster
+        
+        db = self.get_db()
+        try:
+            # Get the project
+            project = db.query(Project).filter(Project.id == project_id).first()
+            if not project:
+                return {"success": False, "error": "Project not found"}
+            
+            # Get all slides with completed images
+            slides = db.query(Slide).filter(
+                Slide.project_id == project_id,
+                Slide.final_image_path.isnot(None)
+            ).order_by(Slide.order_index).all()
+            
+            if len(slides) < 2:
+                return {
+                    "success": False, 
+                    "error": f"Need at least 2 slides with images. Found {len(slides)}. Generate images first."
+                }
+            
+            # Collect image paths
+            image_paths = [slide.final_image_path for slide in slides]
+            
+            # Use project topic as caption if not provided
+            post_caption = caption or project.topic or project.name or "Philosophy Slideshow"
+            
+            # Default hashtags if none provided
+            if hashtags is None:
+                hashtags = ["philosophy", "wisdom", "stoicism", "motivation", "mindset"]
+            
+            # Initialize Instagram poster and post
+            poster = InstagramPoster()
+            
+            # Check connection first
+            status = poster.check_connection()
+            if not status.get("success"):
+                return {
+                    "success": False,
+                    "error": "Instagram not connected via Post Bridge. Connect at https://post-bridge.com/dashboard"
+                }
+            
+            result = poster.post_carousel(
+                image_paths=image_paths,
+                caption=post_caption,
+                hashtags=hashtags,
+                upload_files=True  # Upload local files
+            )
+            
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "project_id": project_id,
+                    "post_id": result.get("post_id"),
+                    "image_count": len(image_paths),
+                    "caption": post_caption,
+                    "hashtags": hashtags,
+                    "destination": "Instagram",
+                    "status": result.get("status", "processing"),
+                    "message": f"Successfully posted {len(image_paths)} slides to Instagram! Post ID: {result.get('post_id')}"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": result.get("error", "Unknown error posting to Instagram"),
+                    "raw_response": result.get("raw_response")
+                }
+                
+        except Exception as e:
+            return {"success": False, "error": f"Failed to post to Instagram: {str(e)}"}
+        finally:
+            db.close()
+    
+    async def _get_instagram_post_status(self, post_id: str) -> Dict[str, Any]:
+        """Check the status of an Instagram post."""
+        from .instagram_poster import InstagramPoster
+        
+        try:
+            poster = InstagramPoster()
+            
+            # Get post status
+            status_result = poster.get_post_status(post_id)
+            if not status_result.get("success"):
+                return status_result
+            
+            # Get post results (success/failure details)
+            results_result = poster.get_post_results(post_id)
+            
+            response = {
+                "success": True,
+                "post_id": post_id,
+                "status": status_result.get("status"),
+                "created_at": status_result.get("created_at"),
+                "caption": status_result.get("caption")
+            }
+            
+            # Add results if available
+            if results_result.get("success"):
+                results = results_result.get("results", [])
+                if results:
+                    for r in results:
+                        platform_data = r.get("platform_data") or {}
+                        if platform_data.get("url"):
+                            response["instagram_url"] = platform_data.get("url")
+                            response["posted"] = True
+                        if r.get("error"):
+                            response["error"] = r.get("error")
+                            response["posted"] = False
+            
+            return response
+            
+        except Exception as e:
+            return {"success": False, "error": f"Failed to check post status: {str(e)}"}
     
     # -------------------------------------------------------------------------
     # AUTOMATION TOOL IMPLEMENTATIONS

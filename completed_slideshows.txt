@@ -2,3 +2,4 @@
 2026-01-12T19:23:39.280524 - flux - Stoicism 101
 2026-01-12T19:25:40.464069 - gpt15 - Stoicism in 60 Seconds
 2026-01-12T21:27:42.861306 - gpt15 - 5 Stoic Philosophers Every Man Should Know
+2026-01-16T11:59:08.507723 - gpt15 - The 5 Deadliest Men in History

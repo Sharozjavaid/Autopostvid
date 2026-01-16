@@ -23,3 +23,6 @@ sse-starlette>=1.6.0
 
 # Cloud Storage
 google-cloud-storage>=2.14.0
+
+# Security - Rate Limiting
+slowapi>=0.1.9
