@@ -15,9 +15,13 @@ import {
   generateAutomationSample,
   addAutomationTopic,
   removeAutomationTopic,
+  getAutomationRuns,
+  retryTikTokPost,
+  API_BASE_URL,
 } from '../api/client';
 import type {
   Automation,
+  AutomationRun,
   ContentType,
   ImageStyle,
   AutomationCreate,
@@ -72,6 +76,75 @@ const MailIcon = () => (
   </svg>
 );
 
+const HistoryIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"/>
+    <polyline points="12 6 12 12 16 14"/>
+  </svg>
+);
+
+const RefreshIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="23 4 23 10 17 10"/>
+    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+  </svg>
+);
+
+const TikTokIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
+  </svg>
+);
+
+const CheckIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
+
+const AlertIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="12" y1="8" x2="12" y2="12"/>
+    <line x1="12" y1="16" x2="12.01" y2="16"/>
+  </svg>
+);
+
+const ImageIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+    <circle cx="8.5" cy="8.5" r="1.5"/>
+    <polyline points="21 15 16 10 5 21"/>
+  </svg>
+);
+
+const ChevronDownIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>
+);
+
+const ChevronUpIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="18 15 12 9 6 15"/>
+  </svg>
+);
+
+// Helper to get automation image URL from path
+const getAutomationImageUrl = (imagePath: string): string => {
+  if (!imagePath) return '';
+
+  // If it's already a full URL, use it
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+
+  // For automation images, they're stored in generated_slideshows/
+  // The static mount is at /static/slides/ which maps to generated_slideshows/
+  const filename = imagePath.replace('generated_slideshows/', '');
+  return `${API_BASE_URL}/static/slides/${filename}`;
+};
+
 const DAYS_OF_WEEK = [
   { id: 'monday', label: 'Mon' },
   { id: 'tuesday', label: 'Tue' },
@@ -88,6 +161,8 @@ export default function Automations() {
   const [selectedAutomation, setSelectedAutomation] = useState<Automation | null>(null);
   const [sampleResult, setSampleResult] = useState<Record<string, unknown> | null>(null);
   const [showSampleModal, setShowSampleModal] = useState(false);
+  const [showRunsModal, setShowRunsModal] = useState(false);
+  const [runsAutomation, setRunsAutomation] = useState<Automation | null>(null);
 
   // Queries
   const { data: automationsData, isLoading } = useQuery({
@@ -188,6 +263,10 @@ export default function Automations() {
               onStop={() => stopMutation.mutate(automation.id)}
               onSample={() => sampleMutation.mutate(automation.id)}
               onDelete={() => deleteMutation.mutate(automation.id)}
+              onShowRuns={() => {
+                setRunsAutomation(automation);
+                setShowRunsModal(true);
+              }}
               isLoading={sampleMutation.isPending && sampleMutation.variables === automation.id}
             />
           ))}
@@ -235,6 +314,19 @@ export default function Automations() {
           />
         )}
       </AnimatePresence>
+
+      {/* Runs History Modal */}
+      <AnimatePresence>
+        {showRunsModal && runsAutomation && (
+          <RunsHistoryModal
+            automation={runsAutomation}
+            onClose={() => {
+              setShowRunsModal(false);
+              setRunsAutomation(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -252,6 +344,7 @@ interface AutomationCardProps {
   onStop: () => void;
   onSample: () => void;
   onDelete: () => void;
+  onShowRuns: () => void;
   isLoading: boolean;
 }
 
@@ -264,6 +357,7 @@ function AutomationCard({
   onStop,
   onSample,
   onDelete,
+  onShowRuns,
   isLoading,
 }: AutomationCardProps) {
   const contentType = contentTypes.find(ct => ct.id === automation.content_type);
@@ -402,13 +496,20 @@ function AutomationCard({
           )}
           <Button
             variant="secondary"
+            onClick={onShowRuns}
+            style={{ flex: 1 }}
+          >
+            <HistoryIcon /> Runs
+          </Button>
+          <Button
+            variant="secondary"
             onClick={onSample}
             disabled={isLoading}
             style={{ flex: 1 }}
           >
             <SampleIcon /> {isLoading ? '...' : 'Sample'}
           </Button>
-          <Button variant="secondary" onClick={onSelect} style={{ flex: 1 }}>
+          <Button variant="secondary" onClick={onSelect} style={{ padding: '8px 12px' }}>
             Edit
           </Button>
           <Button
@@ -1211,6 +1312,496 @@ function SampleResultModal({ result, onClose }: SampleResultModalProps) {
           </Button>
         </div>
       </motion.div>
+    </motion.div>
+  );
+}
+
+
+// =============================================================================
+// RUNS HISTORY MODAL
+// =============================================================================
+
+interface RunsHistoryModalProps {
+  automation: Automation;
+  onClose: () => void;
+}
+
+function RunsHistoryModal({ automation, onClose }: RunsHistoryModalProps) {
+  const queryClient = useQueryClient();
+  const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
+  const [retryMessage, setRetryMessage] = useState<{ runId: string; success: boolean; message: string } | null>(null);
+  const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+
+  // Fetch runs for this automation
+  const { data: runsData, isLoading } = useQuery({
+    queryKey: ['automation-runs', automation.id],
+    queryFn: () => getAutomationRuns(automation.id, 20),
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: (runId: string) => retryTikTokPost(automation.id, runId),
+    onMutate: (runId) => {
+      setRetryingRunId(runId);
+      setRetryMessage(null);
+    },
+    onSuccess: (data, runId) => {
+      setRetryingRunId(null);
+      if (data.success) {
+        setRetryMessage({ runId, success: true, message: data.message || 'Posted to TikTok drafts!' });
+      } else {
+        setRetryMessage({ 
+          runId, 
+          success: false, 
+          message: data.error || 'Failed to post'
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['automation-runs', automation.id] });
+    },
+    onError: (error: Error, runId) => {
+      setRetryingRunId(null);
+      setRetryMessage({ runId, success: false, message: error.message });
+    },
+  });
+
+  const runs = runsData?.runs || [];
+
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return '-';
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const getTikTokStatus = (run: AutomationRun) => {
+    if (run.tiktok_posted && run.tiktok_post_status === 'success') {
+      return { label: 'Posted', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' };
+    }
+    if (run.tiktok_post_status === 'pending' || run.tiktok_post_status === 'processing') {
+      return { label: 'Processing', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' };
+    }
+    if (run.tiktok_post_status === 'failed' || run.tiktok_error) {
+      return { label: 'Failed', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' };
+    }
+    if (run.status === 'completed' && !run.tiktok_posted) {
+      return { label: 'Not Posted', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)' };
+    }
+    return { label: '-', color: '#64748b', bg: 'transparent' };
+  };
+
+  const canRetry = (run: AutomationRun) => {
+    // Can retry if completed/posted but TikTok failed or wasn't attempted
+    return (
+      (run.status === 'completed' || run.status === 'posted') &&
+      run.image_paths &&
+      run.image_paths.length >= 2 &&
+      (run.tiktok_post_status === 'failed' || !run.tiktok_posted)
+    );
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.8)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '24px',
+      }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'linear-gradient(135deg, rgba(30, 30, 50, 0.95), rgba(20, 20, 35, 0.95))',
+          borderRadius: '16px',
+          padding: '32px',
+          maxWidth: '900px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          border: '1px solid rgba(255,255,255,0.1)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <div>
+            <h2 style={{ fontSize: '24px', fontWeight: '600', color: '#fff', marginBottom: '4px' }}>
+              Run History
+            </h2>
+            <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.5)' }}>
+              {automation.name}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(255,255,255,0.1)',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '8px 12px',
+              color: '#fff',
+              cursor: 'pointer',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Info banner about TikTok limits */}
+        <div style={{
+          padding: '12px 16px',
+          background: 'rgba(99, 102, 241, 0.1)',
+          border: '1px solid rgba(99, 102, 241, 0.3)',
+          borderRadius: '8px',
+          marginBottom: '24px',
+        }}>
+          <p style={{ color: '#a5b4fc', fontSize: '13px', lineHeight: '1.5' }}>
+            <strong>💡 TikTok Limit:</strong> Max 5 pending drafts per 24 hours. 
+            If "Retry" fails with <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>spam_risk_too_many_pending_share</code>, 
+            open TikTok and publish/delete some drafts first.
+          </p>
+        </div>
+
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '48px', color: 'rgba(255,255,255,0.5)' }}>
+            Loading runs...
+          </div>
+        ) : runs.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '48px', color: 'rgba(255,255,255,0.5)' }}>
+            No runs yet. Start the automation to generate slideshows.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {runs.map((run) => {
+              const tiktokStatus = getTikTokStatus(run);
+              const showRetry = canRetry(run);
+              const isRetrying = retryingRunId === run.id;
+              const messageForRun = retryMessage?.runId === run.id ? retryMessage : null;
+
+              return (
+                <div
+                  key={run.id}
+                  style={{
+                    padding: '16px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+                    {/* Left: Topic and info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ 
+                        color: '#fff', 
+                        fontSize: '14px', 
+                        fontWeight: '500', 
+                        marginBottom: '8px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {run.topic}
+                      </p>
+                      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
+                          {formatDate(run.started_at)}
+                        </span>
+                        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
+                          ⏱ {formatDuration(run.duration_seconds)}
+                        </span>
+                        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
+                          📊 {run.slides_count} slides
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Right: Status and actions */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                      {/* Run Status */}
+                      <span style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '500',
+                        background: run.status === 'completed' || run.status === 'posted'
+                          ? 'rgba(34, 197, 94, 0.15)' 
+                          : run.status === 'failed'
+                            ? 'rgba(239, 68, 68, 0.15)'
+                            : 'rgba(245, 158, 11, 0.15)',
+                        color: run.status === 'completed' || run.status === 'posted'
+                          ? '#22c55e'
+                          : run.status === 'failed'
+                            ? '#ef4444'
+                            : '#f59e0b',
+                      }}>
+                        {run.status}
+                      </span>
+
+                      {/* TikTok Status */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <TikTokIcon />
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: '500',
+                          background: tiktokStatus.bg,
+                          color: tiktokStatus.color,
+                        }}>
+                          {tiktokStatus.label}
+                        </span>
+                      </div>
+
+                      {/* Retry Button */}
+                      {showRetry && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => retryMutation.mutate(run.id)}
+                          disabled={isRetrying}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            background: 'rgba(99, 102, 241, 0.2)',
+                            border: '1px solid rgba(99, 102, 241, 0.4)',
+                          }}
+                        >
+                          {isRetrying ? (
+                            <>Retrying...</>
+                          ) : (
+                            <><RefreshIcon /> Retry TikTok</>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* View Slides Button */}
+                  {run.image_paths && run.image_paths.length > 0 && (
+                    <button
+                      onClick={() => setExpandedRunId(expandedRunId === run.id ? null : run.id)}
+                      style={{
+                        marginTop: '12px',
+                        padding: '10px 14px',
+                        background: expandedRunId === run.id ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        color: '#fff',
+                      }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                        <ImageIcon />
+                        View {run.image_paths.length} Generated Slides
+                      </span>
+                      {expandedRunId === run.id ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                    </button>
+                  )}
+
+                  {/* Expanded Image Gallery */}
+                  <AnimatePresence>
+                    {expandedRunId === run.id && run.image_paths && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        style={{ overflow: 'hidden' }}
+                      >
+                        <div style={{
+                          marginTop: '12px',
+                          padding: '16px',
+                          background: 'rgba(0,0,0,0.3)',
+                          borderRadius: '12px',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                        }}>
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                            gap: '12px',
+                          }}>
+                            {run.image_paths.map((imagePath, imgIndex) => (
+                              <div
+                                key={imgIndex}
+                                onClick={() => setLightboxImage(getAutomationImageUrl(imagePath))}
+                                style={{
+                                  cursor: 'pointer',
+                                  borderRadius: '8px',
+                                  overflow: 'hidden',
+                                  aspectRatio: '9/16',
+                                  background: 'rgba(255,255,255,0.05)',
+                                  position: 'relative',
+                                }}
+                              >
+                                <img
+                                  src={getAutomationImageUrl(imagePath)}
+                                  alt={`Slide ${imgIndex + 1}`}
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                  }}
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                                <div style={{
+                                  position: 'absolute',
+                                  bottom: '4px',
+                                  left: '4px',
+                                  padding: '2px 6px',
+                                  background: 'rgba(0,0,0,0.7)',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  color: '#fff',
+                                }}>
+                                  {imgIndex + 1}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Error message */}
+                  {run.tiktok_error && !messageForRun && (
+                    <div style={{
+                      marginTop: '12px',
+                      padding: '8px 12px',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}>
+                      <AlertIcon />
+                      <span style={{ fontSize: '12px', color: '#f87171' }}>
+                        {run.tiktok_error}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Retry result message */}
+                  {messageForRun && (
+                    <div style={{
+                      marginTop: '12px',
+                      padding: '8px 12px',
+                      background: messageForRun.success
+                        ? 'rgba(34, 197, 94, 0.1)'
+                        : 'rgba(239, 68, 68, 0.1)',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}>
+                      {messageForRun.success ? <CheckIcon /> : <AlertIcon />}
+                      <span style={{
+                        fontSize: '12px',
+                        color: messageForRun.success ? '#4ade80' : '#f87171'
+                      }}>
+                        {messageForRun.message}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
+          <Button onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </motion.div>
+
+      {/* Lightbox for full-size image */}
+      <AnimatePresence>
+        {lightboxImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setLightboxImage(null)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.95)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2000,
+              padding: '24px',
+              cursor: 'zoom-out',
+            }}
+          >
+            <motion.img
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              src={lightboxImage}
+              alt="Full size slide"
+              style={{
+                maxWidth: '90vw',
+                maxHeight: '90vh',
+                objectFit: 'contain',
+                borderRadius: '12px',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={() => setLightboxImage(null)}
+              style={{
+                position: 'absolute',
+                top: '24px',
+                right: '24px',
+                background: 'rgba(255,255,255,0.1)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '48px',
+                height: '48px',
+                color: '#fff',
+                fontSize: '24px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              ✕
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
