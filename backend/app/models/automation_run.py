@@ -42,6 +42,12 @@ class AutomationRun(Base):
     tiktok_post_status = Column(String(50), nullable=True)  # pending, processing, success, failed
     tiktok_error = Column(Text, nullable=True)
     
+    # Instagram posting
+    instagram_posted = Column(Boolean, default=False)
+    instagram_post_id = Column(String(100), nullable=True)
+    instagram_post_status = Column(String(50), nullable=True)  # pending, posted, failed
+    instagram_error = Column(Text, nullable=True)
+    
     # Error tracking
     error_message = Column(Text, nullable=True)
     error_details = Column(JSON, nullable=True)
@@ -71,6 +77,10 @@ class AutomationRun(Base):
             "tiktok_publish_id": self.tiktok_publish_id,
             "tiktok_post_status": self.tiktok_post_status,
             "tiktok_error": self.tiktok_error,
+            "instagram_posted": self.instagram_posted,
+            "instagram_post_id": self.instagram_post_id,
+            "instagram_post_status": self.instagram_post_status,
+            "instagram_error": self.instagram_error,
             "error_message": self.error_message,
             "settings_used": self.settings_used or {},
             "created_at": self.created_at.isoformat() if self.created_at else None,

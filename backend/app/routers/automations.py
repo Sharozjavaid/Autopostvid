@@ -826,3 +826,107 @@ async def get_tiktok_settings(
         "post_to_tiktok": settings.get("post_to_tiktok", False),
         "post_to_drafts": settings.get("post_to_drafts", True)
     }
+
+
+# =============================================================================
+# INSTAGRAM SETTINGS
+# =============================================================================
+
+class InstagramSettingsUpdate(BaseModel):
+    """Update Instagram posting settings."""
+    post_to_instagram: bool = False
+
+
+@router.put("/{automation_id}/instagram-settings")
+async def update_instagram_settings(
+    automation_id: str,
+    data: InstagramSettingsUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update Instagram posting settings for an automation."""
+    automation = db.query(Automation).filter(Automation.id == automation_id).first()
+    if not automation:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    
+    settings = automation.settings or {}
+    settings["post_to_instagram"] = data.post_to_instagram
+    automation.settings = settings
+    db.commit()
+    
+    return {
+        "success": True,
+        "post_to_instagram": data.post_to_instagram
+    }
+
+
+@router.get("/{automation_id}/instagram-settings")
+async def get_instagram_settings(
+    automation_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get Instagram posting settings for an automation."""
+    automation = db.query(Automation).filter(Automation.id == automation_id).first()
+    if not automation:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    
+    settings = automation.settings or {}
+    
+    return {
+        "post_to_instagram": settings.get("post_to_instagram", False)
+    }
+
+
+# =============================================================================
+# SOCIAL POSTING SETTINGS (Combined)
+# =============================================================================
+
+class SocialSettingsUpdate(BaseModel):
+    """Update all social posting settings at once."""
+    post_to_tiktok: bool = False
+    post_to_instagram: bool = False
+    post_to_drafts: bool = True  # TikTok drafts
+
+
+@router.put("/{automation_id}/social-settings")
+async def update_social_settings(
+    automation_id: str,
+    data: SocialSettingsUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update all social posting settings for an automation."""
+    automation = db.query(Automation).filter(Automation.id == automation_id).first()
+    if not automation:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    
+    settings = automation.settings or {}
+    settings["post_to_tiktok"] = data.post_to_tiktok
+    settings["post_to_instagram"] = data.post_to_instagram
+    settings["post_to_drafts"] = data.post_to_drafts
+    automation.settings = settings
+    db.commit()
+    
+    return {
+        "success": True,
+        "post_to_tiktok": data.post_to_tiktok,
+        "post_to_instagram": data.post_to_instagram,
+        "post_to_drafts": data.post_to_drafts
+    }
+
+
+@router.get("/{automation_id}/social-settings")
+async def get_social_settings(
+    automation_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get all social posting settings for an automation."""
+    automation = db.query(Automation).filter(Automation.id == automation_id).first()
+    if not automation:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    
+    settings = automation.settings or {}
+    
+    return {
+        "post_to_tiktok": settings.get("post_to_tiktok", False),
+        "post_to_instagram": settings.get("post_to_instagram", False),
+        "post_to_drafts": settings.get("post_to_drafts", True)
+    }

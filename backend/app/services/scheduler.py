@@ -257,6 +257,10 @@ class AutomationScheduler:
                     if settings.get("post_to_tiktok", False):
                         self._post_to_tiktok(run, result, db)
                     
+                    # Post to Instagram if enabled
+                    if settings.get("post_to_instagram", False):
+                        self._post_to_instagram(run, result, db)
+                    
                     # Update automation stats
                     automation.successful_runs += 1
                     automation.advance_topic()
@@ -321,6 +325,45 @@ class AutomationScheduler:
             run.tiktok_post_status = "failed"
             db.commit()
             logger.exception(f"TikTok posting error: {e}")
+    
+    def _post_to_instagram(self, run: AutomationRun, result: dict, db: Session):
+        """Post the generated slideshow to Instagram."""
+        try:
+            from ..services.instagram_poster import InstagramPoster
+            
+            poster = InstagramPoster()
+            
+            image_paths = result.get("image_paths", [])
+            if not image_paths:
+                run.instagram_error = "No images to post"
+                return
+            
+            # Generate caption from topic
+            title = result.get("title", run.topic)
+            caption = f"{title}\n\n#philosophy #stoicism #wisdom #motivation #ancientwisdom #philosophyquotes"
+            
+            # Post as carousel
+            post_result = poster.post_carousel(
+                image_paths=image_paths,
+                caption=caption
+            )
+            
+            if post_result.get("success"):
+                run.instagram_post_id = post_result.get("post_id", "")
+                run.instagram_post_status = "posted"
+                logger.info(f"Posted to Instagram: {post_result.get('post_id')}")
+            else:
+                run.instagram_error = post_result.get("error", "Unknown Instagram error")
+                run.instagram_post_status = "failed"
+                logger.error(f"Instagram post failed: {run.instagram_error}")
+            
+            db.commit()
+            
+        except Exception as e:
+            run.instagram_error = str(e)
+            run.instagram_post_status = "failed"
+            db.commit()
+            logger.exception(f"Instagram posting error: {e}")
     
     def run_now(self, automation_id: str):
         """Trigger an immediate run of an automation (for testing)."""
