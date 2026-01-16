@@ -13,9 +13,9 @@ When working on specific areas, apply these specialized knowledge patterns:
 ### 🗄️ Database Agent
 **Trigger**: Any work involving database, models, migrations, SQLAlchemy, or schema changes.
 
-**Key Knowledge**:
-1. Database file is at `./philosophy_generator.db` (relative to working directory - run from project root!)
-2. SQLite doesn't support all ALTER TABLE operations - see Database section for migration patterns
+**Quick Reference** (see `docs/database.md` for full details):
+1. Database file: `./philosophy_generator.db` (relative to working directory - run from project root!)
+2. SQLite doesn't support all ALTER TABLE operations - see `docs/database.md` for migration patterns
 3. Never use `metadata` as a column name (reserved by SQLAlchemy)
 4. Always check schema with `PRAGMA table_info(tablename)` before/after changes
 5. When adding columns, update BOTH the SQLAlchemy model AND run ALTER TABLE on existing databases
@@ -26,22 +26,26 @@ When working on specific areas, apply these specialized knowledge patterns:
 - [ ] Run `ALTER TABLE` on local dev database
 - [ ] Verify with `PRAGMA table_info()`
 - [ ] Restart backend to pick up model changes
-- [ ] Update this rules file's Database Schema section
+- [ ] Update `docs/database.md` schema section
+
+**For complete details**: See `docs/database.md` (schema, migrations, operations, model files)
 
 ### 🤖 Agent System Agent
 **Trigger**: Work on the AI agent, tools, memory, or Claude integration.
 
-**Key Knowledge**:
+**Quick Reference** (see `docs/agent.md` for full details):
 1. Model config is in ONE place: `backend/app/config.py` → `CLAUDE_MODEL`
 2. Agent tools are in `backend/app/services/agent_tools.py`
 3. System prompt is in `backend/app/services/agent_service.py`
 4. Memory files are in `/memory/` - agent has tools to read/write them
 5. Agent uses streaming SSE for responses
 
+**For complete details**: See `docs/agent.md` (Claude config, memory system, gallery, streaming protocol)
+
 ### 📱 TikTok Integration Agent
 **Trigger**: Work on TikTok posting, OAuth, or social media features.
 
-**Key Knowledge**:
+**Quick Reference** (see `docs/tiktok.md` for full details):
 1. ALL uploads go to DRAFTS (never direct publish)
 2. Videos use `/v2/post/publish/inbox/video/init/`
 3. Photo slideshows use `/v2/post/publish/content/init/` with `post_mode: "MEDIA_UPLOAD"`
@@ -49,10 +53,26 @@ When working on specific areas, apply these specialized knowledge patterns:
 5. Tokens stored in `.tiktok_tokens.json`
 6. Local testing won't work - TikTok needs public URLs
 
+**For complete details**: See `docs/tiktok.md` (API endpoints, OAuth flow, CLI commands, troubleshooting)
+
+### 📸 Instagram Integration Agent (Post Bridge)
+**Trigger**: Work on Instagram posting or Post Bridge API.
+
+**Quick Reference** (see `docs/instagram.md` for full details):
+1. Uses **Post Bridge API** (https://post-bridge.com) - no OAuth complexity
+2. API Key: `pb_live_RP1nqdE71wi7Fki6iVziL1`
+3. Instagram account: `philosophizeme_app` (ID: 41667)
+4. Posts go DIRECTLY to Instagram (not drafts like TikTok)
+5. Service: `backend/app/services/instagram_poster.py`
+6. CLI: `instagram_cli.py` for testing
+7. Max 10 images per carousel, PNG format supported
+
+**For complete details**: See `docs/instagram.md` (API flow, CLI commands, agent tools)
+
 ### 🎨 Image Generation Agent
 **Trigger**: Work on image generation, fonts, themes, or text overlay.
 
-**Key Knowledge**:
+**Quick Reference** (see `docs/fonts.md` for full font system):
 1. Two-layer system: AI background + Pillow text overlay
 2. Fonts are in `/fonts/` directory
 3. Font config is in BOTH `text_overlay.py` files (root + backend)
@@ -60,22 +80,117 @@ When working on specific areas, apply these specialized knowledge patterns:
 5. Always generate background first, then apply text
 6. **Images are uploaded to GCS** - see Cloud Storage section
 
-### ☁️ Cloud Storage Agent
-**Trigger**: Work on file storage, image persistence, or cloud infrastructure.
+**For complete details**: See `docs/fonts.md` (font architecture, available fonts, rendering details, API endpoints)
 
-**Key Knowledge**:
-1. All generated images upload to **Google Cloud Storage** bucket: `philosophy-content-storage`
+### ☁️ Cloud Storage Agent
+**Trigger**: Work on file storage, image persistence, video storage, or cloud infrastructure.
+
+**Quick Reference**:
+1. **ALL generated content** uploads to **Google Cloud Storage** bucket: `philosophy-content-storage`
 2. Public URLs: `https://storage.googleapis.com/philosophy-content-storage/...`
 3. Service: `backend/app/services/cloud_storage.py`
 4. Credentials file: `gcs-credentials.json` (gitignored)
 5. Database stores GCS URLs instead of local paths
 6. Frontend `getSlideImageUrl()` handles both GCS and local URLs automatically
+7. Videos auto-upload via `upload_video_to_gcs()` helper
 
-**Folder Structure in GCS:**
-- `backgrounds/` - AI-generated background images
-- `slides/` - Final slides with text overlay
-- `scripts/` - Generated scripts (if stored)
-- `test/` - Test uploads
+**GCS Bucket Structure:**
+```
+gs://philosophy-content-storage/
+├── videos/       # Generated MP4 videos (auto-uploaded after creation)
+├── slides/       # Final slides with text overlay
+├── images/       # AI-generated background images  
+├── tiktok/       # TikTok-specific content
+└── test/         # Test uploads
+```
+
+**Storage Architecture:**
+```
+┌─────────────────────────────────────────┐
+│         VM (Temporary/Processing)        │
+│                                          │
+│  🐍 Python code executes here            │
+│  🗄️ SQLite database (project metadata)  │
+│  📁 Temp files during generation         │
+│  📝 Logs (/logs/backend.log)            │
+└─────────────────────────────────────────┘
+                    │
+                    │ Auto-upload after generation
+                    ▼
+┌─────────────────────────────────────────┐
+│    Google Cloud Storage (Permanent)      │
+│    gs://philosophy-content-storage       │
+│                                          │
+│  📹 videos/   - All generated videos     │
+│  🖼️ slides/   - Final slide images       │
+│  🎨 images/   - Background images        │
+│  📱 tiktok/   - TikTok media             │
+└─────────────────────────────────────────┘
+                    │
+                    │ Public URLs served globally
+                    ▼
+    https://storage.googleapis.com/philosophy-content-storage/...
+```
+
+**Key Files:**
+- `backend/app/services/cloud_storage.py` - Main GCS service
+- `upload_video_to_gcs()` - Helper for video uploads
+- `get_storage_service()` - Singleton accessor
+
+**Upload Flow:**
+1. Content generated on VM (video, image, etc.)
+2. Saved to local temp directory
+3. Auto-uploaded to GCS bucket
+4. GCS public URL stored in database
+5. Local file can be deleted (saves VM space)
+
+### 🚀 DevOps Agent
+**Trigger**: Work on deployment, GCP VM, nginx, server issues, 502 errors, or production debugging.
+
+**Quick Reference** (see `docs/devops.md` for complete architecture):
+1. **Full docs**: See `DEVOPS.md` AND `docs/devops.md` for complete architecture
+2. **GCP VM**: `philosophy-bot-vm` in zone `us-central1-a`, IP `23.251.149.244`
+3. **GCP Project**: `philosophy-bot-05854` (VM project, separate from AI API project)
+4. **Code path on VM**: `/home/runner/philosophy_video_generator`
+5. **Backend**: Uvicorn on port 8001, proxied by Nginx
+6. **No git on VM**: Code synced via `gcloud compute scp`, not git pull
+
+**What Lives Where:**
+| Component | Location | Notes |
+|-----------|----------|-------|
+| Python code | VM | Runs the backend |
+| SQLite database | VM | `/backend/philosophy_generator.db` |
+| Logs | VM | `/logs/backend.log` |
+| Videos, Images, Slides | **Cloud Storage** | Permanent, public URLs |
+
+**Common Commands:**
+```bash
+# SSH to VM
+gcloud compute ssh philosophy-bot-vm --zone=us-central1-a
+
+# Check if backend running
+gcloud compute ssh philosophy-bot-vm --zone=us-central1-a --command="ps aux | grep uvicorn"
+
+# Copy file to VM
+gcloud compute scp localfile.py philosophy-bot-vm:/tmp/ --zone=us-central1-a
+
+# Restart backend (see docs/devops.md for full command)
+```
+
+**For complete details**: See `docs/devops.md` (VM access, deployment, CI/CD, troubleshooting)
+
+### 🔐 Security Agent
+**Trigger**: Work on authentication, API security, rate limiting, or CORS.
+
+**Quick Reference** (see `docs/security.md` for full details):
+1. **API Key Required**: All protected endpoints require `X-API-Key` header
+2. **Current API Key**: `b4TZ2d11ZDkXpDNU_V8m4KxyYdCdJMERKMyVvgyyYz0`
+3. **Config**: `backend/app/config.py` → `api_key` setting
+4. **Middleware**: `backend/app/middleware/` contains auth, rate limiter, error handler
+5. **Public endpoints**: `/`, `/api/health`, `/api/settings/models`, `/api/tiktok/media/*`
+6. **SSE exception**: Agent streaming uses `?api_key=` query param (EventSource limitation)
+
+**For complete details**: See `docs/security.md` (auth flow, rate limits, CORS, error handling, deployment)
 
 ## Directory Structure
 ```
@@ -92,6 +207,7 @@ When working on specific areas, apply these specialized knowledge patterns:
   /pages/              # Page components (Agent, StaticSlideshow, Projects, etc.)
 /fonts/                # Custom fonts for text overlay
 /logs/                 # Runtime logs (gitignored)
+/docs/                 # Detailed documentation (database, devops, integrations, etc.)
 ```
 
 ## Running the Project
@@ -111,6 +227,9 @@ When working on specific areas, apply these specialized knowledge patterns:
 - Always create SlideVersion when modifying slide images or content
 - Image generation always creates: background → text overlay → final image
 - Use `slide.create_version(db, change_type, description)` for versioning
+- **All protected routes require `X-API-Key` header** - see `docs/security.md`
+- New routes default to protected; use `dependencies=[Depends(verify_api_key)]`
+- Public routes (health, models) have NO auth dependency
 
 ### Frontend (React/TypeScript)
 - Use TanStack Query for all API calls with proper queryKey patterns
@@ -118,6 +237,8 @@ When working on specific areas, apply these specialized knowledge patterns:
 - Never hardcode `http://127.0.0.1:8001` - use `API_BASE_URL` from client.ts
 - Components use inline styles with motion from framer-motion
 - GlassCard is the standard card component with `padding` and `gradient` props
+- **API key is auto-included** via axios interceptor in `client.ts`
+- Set `VITE_API_KEY` in `.env.local` (local) or Vercel (production)
 
 ### API Client Pattern
 ```typescript
@@ -145,172 +266,6 @@ import { getSlideImageUrl, API_BASE_URL, reapplyTextOverlay } from '../api/clien
 ### Theme System
 Available themes: `glitch_titans`, `oil_contrast`, `golden_dust`, `scene_portrait`
 Each theme defines: base_prompt, hook_prompt, content_prompt, outro_prompt, negative_prompt
-
-### Font System - Complete Architecture
-
-#### How Fonts Work in the Slideshow Pipeline
-
-The slideshow generation uses a **two-layer compositing system**:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  LAYER 1: Background Image (AI-Generated)                   │
-│  - Generated by GPT-Image-1.5, Flux, or DALL-E 3            │
-│  - Contains NO text - pure visual/artistic background       │
-│  - Saved to: slide.background_image_path                    │
-│  - Dimensions: 1080x1920 (TikTok 9:16 vertical)             │
-└─────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│  LAYER 2: Text Overlay (Pillow/PIL)                         │
-│  - Rendered programmatically using TextOverlay class        │
-│  - Uses TTF font files from /fonts/ directory               │
-│  - Applies: shadow, outline, positioning, word wrap         │
-│  - Composited onto background → saved to final_image_path   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Why this separation matters:**
-- Font changes are FAST (reuses existing background, just re-renders text)
-- Theme changes require full regeneration (new AI background needed)
-- Text is always crisp (not AI-generated, so no artifacts)
-- Consistent typography across all slides
-
-#### Available Fonts
-
-| Font ID | Name | Style | Best For |
-|---------|------|-------|----------|
-| `tiktok` | TikTok Sans | Official TikTok font, clean modern | Authentic TikTok look |
-| `tiktok-bold` | TikTok Sans Bold | Official TikTok display | Bold headlines |
-| `social` | Social Media (Default) | Montserrat Bold, sentence case | General social media |
-| `bebas` | Bebas Neue | ALL CAPS display | Impact/punch |
-| `montserrat` | Montserrat Bold | Modern sans-serif | Clean modern look |
-| `cinzel` | Cinzel Bold | Roman/classical | Ancient wisdom vibes |
-| `oswald` | Oswald Bold | Condensed sans | Strong headlines |
-| `cormorant` | Cormorant Italic | Elegant serif italic | @philosophaire style |
-
-#### Font Files Location
-
-```
-/fonts/                          # Project root fonts directory
-  ├── TikTokSans-Regular.ttf     # Official TikTok font
-  ├── TikTokSans-Bold.ttf        # Official TikTok bold
-  ├── Montserrat-Bold.ttf        # Default for "social" style
-  ├── Montserrat-Italic.ttf
-  ├── Bebas-Regular.ttf          # All-caps display
-  ├── Cinzel-Bold.ttf            # Classical/Roman
-  ├── Oswald-Bold.ttf            # Condensed headlines
-  └── CormorantGaramond-Italic.ttf  # Elegant italic
-```
-
-#### Font Configuration in Code
-
-Each font has settings that control rendering behavior:
-
-```python
-# In text_overlay.py - FONTS dict
-"tiktok": {
-    "name": "TikTok Sans",
-    "file": "TikTokSans-Regular.ttf",
-    "category": "tiktok",
-    "settings": {
-        "uppercase": False,      # Sentence case (True = ALL CAPS)
-        "shadow": True,          # Drop shadow for legibility
-        "outline": True,         # Thin outline for contrast
-        "outline_width": 2,      # Outline thickness in pixels
-    }
-}
-```
-
-#### API Endpoints for Fonts
-
-```bash
-# Get available fonts (frontend uses this for dropdowns)
-GET /api/settings/models
-# Returns: { fonts: [{ id, name, style }], ... }
-
-# Generate image with specific font
-POST /api/images/{slide_id}/generate
-Body: { model: "gpt15", font: "tiktok", theme: "golden_dust" }
-
-# Change font only (fast - reuses background)
-POST /api/images/{slide_id}/reapply-text?font=tiktok-bold
-
-# Full regenerate with new theme + font
-POST /api/images/{slide_id}/generate
-Body: { model: "gpt15", font: "bebas", theme: "oil_contrast" }
-```
-
-#### Adding a New Font
-
-1. **Add TTF file** to `/fonts/` directory
-2. **Update both text_overlay.py files:**
-   - `/text_overlay.py` (root - for CLI/scripts)
-   - `/backend/app/services/text_overlay.py` (for API)
-3. **Add to FONTS dict:**
-```python
-"new-font": {
-    "name": "Display Name",
-    "description": "What it looks like",
-    "file": "NewFont-Bold.ttf",
-    "category": "modern",  # tiktok, social, modern, elegant, classical, display
-    "settings": { ... }  # Optional overrides
-}
-```
-4. **Add to FONT_CATEGORIES** if creating new category
-5. **Update API response** in `/backend/app/main.py`:
-```python
-"fonts": [
-    {"id": "new-font", "name": "Display Name", "style": "Description"},
-    ...
-]
-```
-
-#### Font Rendering Details (TextOverlay class)
-
-The TextOverlay class handles all text rendering with these methods:
-
-```python
-# Simple text on image
-overlay.add_text_to_image(image_path, text, output_path, font_name="tiktok")
-
-# Full slide with title, subtitle, number
-overlay.create_slide(
-    background_path="bg.png",
-    output_path="slide.png",
-    title="MARCUS AURELIUS",
-    subtitle="The Emperor-Philosopher",
-    slide_number=1,
-    font_name="tiktok-bold"
-)
-
-# Hook slide (first slide - grabs attention)
-overlay.create_hook_slide(background_path, output_path, hook_text, font_name="tiktok")
-
-# Outro slide (call to action)
-overlay.create_outro_slide(background_path, output_path, text, subtitle, font_name="social")
-```
-
-#### Text Rendering Effects
-
-1. **Shadow**: Drop shadow for depth (offset 3-4px, semi-transparent black)
-2. **Outline**: Thin stroke around text for legibility on any background
-3. **Social Style**: Combines shadow + thin outline (best for readability)
-
-```python
-# Social style rendering (used by tiktok, social fonts)
-def _draw_text_social_style(draw, position, text, font):
-    # 1. Draw drop shadow (offset bottom-right)
-    # 2. Draw thin outline (2px black stroke)
-    # 3. Draw white text on top
-```
-
-#### Important Notes
-
-- **Backend runs from /backend/**: Font path is resolved as `Path(__file__).parent.parent.parent.parent / "fonts"`
-- **Font caching**: TextOverlay caches loaded fonts by size for performance
-- **Fallback fonts**: If custom font fails, falls back to system fonts (Helvetica, Arial)
-- **TikTok dimensions**: All slides are 1080x1920 (9:16 vertical format)
 
 ## Common Tasks
 
@@ -341,691 +296,45 @@ GOOGLE_API_KEY=...
 ELEVENLABS_API_KEY=...
 FAL_KEY=...
 ANTHROPIC_API_KEY=...
+API_KEY=your-secure-api-key-here  # Required for API authentication
 ```
 
-## Claude API Configuration
-
-### Model Selection (SINGLE SOURCE OF TRUTH)
-
-The Claude model is configured in ONE place only: **`backend/app/config.py`**
-
-```python
-# backend/app/config.py - THE ONLY PLACE TO CHANGE THE MODEL
-CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
-CLAUDE_MAX_TOKENS = 16384
-CLAUDE_MAX_ITERATIONS = 25
-
-# Available models for prompt caching:
-# - claude-sonnet-4-5-20250929 (recommended - best price/performance)
-# - claude-opus-4-20250514 (most capable, expensive)
-# - claude-haiku-3-5-20241022 (fastest/cheapest)
+### Frontend (.env.local in /frontend)
+```
+VITE_API_URL=http://127.0.0.1:8001  # or https://api.cofndrly.com for production
+VITE_API_KEY=your-secure-api-key-here  # Must match backend API_KEY
 ```
 
-All other files import from this config:
-- `backend/app/services/agent_service.py` - Imports `CLAUDE_MODEL`, `CLAUDE_MAX_TOKENS`, `CLAUDE_MAX_ITERATIONS`
-- `agent_runner.py` - Imports with fallback for standalone CLI use
-- `agent_tools.py` - Imports with fallback for standalone CLI use
+## Production Deployment
 
-**To change the model:** Edit `backend/app/config.py` and restart the backend. That's it.
+### Domain & Infrastructure Overview
+| Service | URL/Location | Platform |
+|---------|--------------|----------|
+| **React Frontend** | `https://app.cofndrly.com` | Vercel |
+| **Backend API** | `https://api.cofndrly.com` | GCP VM (`philosophy-bot-vm`) |
+| **Videos** | `https://storage.googleapis.com/philosophy-content-storage/videos/...` | GCS Bucket |
+| **Slides** | `https://storage.googleapis.com/philosophy-content-storage/slides/...` | GCS Bucket |
+| **Images** | `https://storage.googleapis.com/philosophy-content-storage/images/...` | GCS Bucket |
+| **TikTok Callback** | `https://api.cofndrly.com/api/tiktok/callback` | GCP VM |
 
-### Prompt Caching
-We use Anthropic's prompt caching for 90% cost reduction on repeated content:
+### GCP Projects (Two Separate Projects!)
+| Project Name | Project ID | Purpose |
+|--------------|------------|---------|
+| **Philosophy Video Bot** | `philosophy-bot-05854` | VM, Cloud Storage, main infrastructure |
+| **phil automation** | `gen-lang-client-0911658567` | Gemini AI API access only |
 
-- **Tools**: Cached via `cache_control` on last tool definition
-- **System prompt**: Cached as separate block
-- **Memory context**: Cached separately (allows updates without invalidating system cache)
+### Storage Summary
+- **Database**: SQLite on VM (`/home/runner/.../backend/philosophy_generator.db`)
+- **All media files**: Google Cloud Storage bucket `philosophy-content-storage`
+- **Logs**: On VM (`/home/runner/.../logs/backend.log`)
 
-Cache pricing (Claude Sonnet 4.5):
-- Base input: $3/MTok
-- Cache write: $3.75/MTok (1.25x, one-time)
-- Cache read: $0.30/MTok (0.1x, 90% savings!)
-
-Monitor cache usage in logs:
-```
-📊 Cache: read=4500, created=0, uncached=50
-```
-
-### Key Files
-- `backend/app/config.py` - **SINGLE SOURCE** for CLAUDE_MODEL constant
-- `backend/app/services/agent_service.py` - Main agent service (imports from config)
-- `agent_runner.py` - CLI agent runner (imports from config with fallback)
-- `agent_tools.py` - Tool definitions (imports from config with fallback)
-
-### Frontend (.env in /frontend)
-```
-VITE_API_URL=http://127.0.0.1:8001  # or production URL
-```
-
-## Database
-
-### Overview
-- **Engine**: SQLite with SQLAlchemy ORM
-- **Database File**: `./philosophy_generator.db` (relative to working directory)
-- **Config**: `backend/app/database.py` uses `settings.database_url`
-- **Models**: Auto-create tables on startup via `Base.metadata.create_all()`
-
-**⚠️ IMPORTANT**: The database path is RELATIVE (`sqlite:///./philosophy_generator.db`). 
-When running from project root, it uses `./philosophy_generator.db` in root.
-When running from `/backend/`, it would use `/backend/philosophy_generator.db`.
-Always run uvicorn from project root to use the correct database.
-
-### Database Schema
-
-#### `projects` - Main project/slideshow container
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | VARCHAR(36) PK | UUID |
-| `name` | VARCHAR(255) | Project display name |
-| `topic` | TEXT | Full topic/prompt description |
-| `content_type` | VARCHAR(50) | 'slideshow' or 'video' |
-| `script_style` | VARCHAR(50) | 'list', 'narrative', 'mentor_slideshow', 'wisdom_slideshow' |
-| `status` | VARCHAR(50) | 'draft', 'script_review', 'script_approved', 'generating', 'complete', 'error' |
-| `script_approved` | VARCHAR(1) | 'Y' or 'N' |
-| `settings` | JSON | `{"image_model": "gpt15", "font": "bebas", "theme": "dark"}` |
-| `created_at` | DATETIME | |
-| `updated_at` | DATETIME | |
-
-#### `slides` - Individual slides within a project
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | VARCHAR(36) PK | UUID |
-| `project_id` | VARCHAR(36) FK | References projects.id |
-| `order_index` | INTEGER | 0-based slide order |
-| `title` | TEXT | Main text (often ALL CAPS) |
-| `subtitle` | TEXT | Secondary text |
-| `visual_description` | TEXT | AI image prompt |
-| `narration` | TEXT | Voice-over script (if applicable) |
-| `background_image_path` | VARCHAR(500) | AI-generated background (no text) |
-| `final_image_path` | VARCHAR(500) | Background + text overlay |
-| `video_clip_path` | VARCHAR(500) | For video projects |
-| `current_font` | VARCHAR(50) | 'tiktok-bold', 'bebas', etc. |
-| `current_theme` | VARCHAR(50) | 'oil_contrast', 'golden_dust', etc. |
-| `current_version` | INTEGER | Version number for history |
-| `image_status` | VARCHAR(50) | 'pending', 'generating', 'complete', 'error' |
-| `error_message` | TEXT | Error details if failed |
-| `created_at` | DATETIME | |
-| `updated_at` | DATETIME | |
-
-#### `slide_versions` - Version history for slides
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | VARCHAR(36) PK | UUID |
-| `slide_id` | VARCHAR(36) FK | References slides.id |
-| `version_number` | INTEGER | 1, 2, 3... |
-| `title`, `subtitle`, `visual_description`, `narration` | TEXT | Snapshot of content |
-| `font`, `theme` | VARCHAR(50) | Font/theme used |
-| `background_image_path`, `final_image_path` | VARCHAR(500) | Image paths |
-| `change_type` | VARCHAR(50) | 'initial', 'text_edit', 'font_change', 'theme_change', 'regenerate', 'revert' |
-| `change_description` | TEXT | Human-readable description |
-| `version_metadata` | JSON | Additional data |
-| `created_at` | DATETIME | |
-
-#### `automations` - Scheduled content generation
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | VARCHAR(36) PK | UUID |
-| `name` | VARCHAR(255) | Automation name |
-| `content_type` | VARCHAR(50) | 'wisdom_slideshow', 'mentor_slideshow', etc. |
-| `image_style` | VARCHAR(50) | 'classical', 'cinematic', etc. |
-| `topics` | JSON | List of topics to cycle through |
-| `current_topic_index` | INTEGER | Current position in topics list |
-| `schedule_times` | JSON | ['09:00', '14:00'] |
-| `schedule_days` | JSON | ['mon', 'tue', 'wed', 'thu', 'fri'] |
-| `status` | VARCHAR(50) | 'idle', 'running', 'paused' |
-| `is_active` | BOOLEAN | Whether automation is enabled |
-| `last_run`, `next_run` | DATETIME | Timing |
-| `total_runs`, `successful_runs`, `failed_runs` | INTEGER | Stats |
-| `email_enabled` | BOOLEAN | Send notifications |
-| `email_address` | VARCHAR(255) | Notification email |
-| `settings` | JSON | Additional settings |
-| `config` | JSON | Legacy config field |
-| `created_at`, `updated_at` | DATETIME | |
-
-#### `automation_runs` - History of automation executions
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | VARCHAR(36) PK | UUID |
-| `automation_id` | VARCHAR(36) FK | References automations.id |
-| `topic` | VARCHAR(500) | Topic used for this run |
-| `status` | VARCHAR(50) | 'running', 'success', 'error' |
-| `started_at`, `completed_at` | DATETIME | Timing |
-| `duration_seconds` | INTEGER | How long it took |
-| `project_id` | VARCHAR(36) | Created project ID |
-| `slides_count` | INTEGER | Number of slides generated |
-| `image_paths` | JSON | List of generated image paths |
-| `tiktok_posted` | BOOLEAN | Whether posted to TikTok |
-| `tiktok_publish_id` | VARCHAR(100) | TikTok's publish ID |
-| `error_message`, `error_details` | TEXT/JSON | Error info |
-| `created_at` | DATETIME | |
-
-#### `gallery_items` - Agent gallery for saved content
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | VARCHAR(36) PK | UUID |
-| `item_type` | VARCHAR(50) | 'slide', 'script', 'prompt', 'image', 'project' |
-| `project_id`, `slide_id` | VARCHAR(36) | Optional references |
-| `title`, `subtitle`, `description` | TEXT | Content |
-| `image_url`, `thumbnail_url` | VARCHAR(500) | Image URLs |
-| `font`, `theme`, `content_style` | VARCHAR(50) | Styling info |
-| `extra_data` | JSON | Additional metadata (NOT 'metadata' - reserved!) |
-| `status` | VARCHAR(50) | 'complete', 'draft', 'failed' |
-| `session_id` | VARCHAR(36) | Agent session that created it |
-| `created_at`, `updated_at` | DATETIME | |
-
-#### `generation_logs` - API call/cost tracking
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | VARCHAR(36) PK | UUID |
-| `project_id` | VARCHAR(36) FK | Optional reference |
-| `action` | VARCHAR(100) | 'generate_image', 'generate_script', etc. |
-| `model_used` | VARCHAR(100) | 'gpt15', 'claude-sonnet-4-5', etc. |
-| `details` | JSON | Request/response details |
-| `cost` | FLOAT | Estimated cost in USD |
-| `tokens_used` | INTEGER | Token count |
-| `success` | BOOLEAN | Whether it succeeded |
-| `error_message` | TEXT | Error if failed |
-| `created_at` | DATETIME | |
-
-### Database Migrations
-
-SQLite doesn't support all ALTER TABLE operations. For adding columns:
-
-```bash
-# Add a column with default value
-sqlite3 philosophy_generator.db "ALTER TABLE projects ADD COLUMN new_column VARCHAR(50) DEFAULT 'value';"
-
-# Verify
-sqlite3 philosophy_generator.db "PRAGMA table_info(projects);"
-```
-
-For complex migrations (rename column, change type), you need to:
-1. Create new table with correct schema
-2. Copy data from old table
-3. Drop old table
-4. Rename new table
-
-### Common Database Operations
-
-```bash
-# Check table schema
-sqlite3 philosophy_generator.db "PRAGMA table_info(slides);"
-
-# List all tables
-sqlite3 philosophy_generator.db ".tables"
-
-# Query project with slides
-sqlite3 philosophy_generator.db "SELECT p.name, COUNT(s.id) as slides FROM projects p LEFT JOIN slides s ON p.id = s.project_id GROUP BY p.id;"
-
-# Copy data between databases
-sqlite3 philosophy_generator.db << 'EOF'
-ATTACH DATABASE 'backend/philosophy_generator.db' AS other;
-INSERT INTO slides SELECT * FROM other.slides WHERE project_id = 'uuid';
-DETACH DATABASE other;
-EOF
-```
-
-### Model Files
-- `backend/app/models/project.py` - Project model
-- `backend/app/models/slide.py` - Slide model with versioning
-- `backend/app/models/automation.py` - Automation model
-- `backend/app/models/gallery_item.py` - Gallery model
-
-**⚠️ CRITICAL**: Never use `metadata` as a column name - it's reserved by SQLAlchemy!
+**For complete deployment details**: See `docs/devops.md`
 
 ## Testing Changes
 1. Backend auto-reloads with `--reload` flag
 2. Frontend uses Vite HMR for instant updates
 3. Always test font changes (fast path) and theme changes (full regen) separately
 4. Check version history UI after making changes
-
-## Production Deployment
-
-### Domain & Infrastructure Overview
-| Service | URL | Status |
-|---------|-----|--------|
-| **React Frontend** | `https://app.cofndrly.com` | ✅ Live on Vercel |
-| **Backend API** | `https://api.cofndrly.com` | ✅ Live on GCP VM |
-| **Static Images** | `https://api.cofndrly.com/static/images/...` | ✅ Served by FastAPI |
-| **Static Slides** | `https://api.cofndrly.com/static/slides/...` | ✅ Served by FastAPI |
-| **TikTok Callback** | `https://api.cofndrly.com/api/tiktok/callback` | ✅ Verified |
-
-### GCP VM Details
-- **VM Name**: `philosophy-bot-vm`
-- **Zone**: `us-central1-a`
-- **External IP**: `23.251.149.244`
-- **Domain**: `api.cofndrly.com` → points to the VM (A record in GoDaddy)
-- **Code Location on VM**: `/home/runner/philosophy_video_generator`
-
-### Accessing the VM
-```bash
-# List VMs
-gcloud compute instances list
-
-# SSH into the VM
-gcloud compute ssh philosophy-bot-vm --zone=us-central1-a
-
-# Run a command on the VM
-gcloud compute ssh philosophy-bot-vm --zone=us-central1-a --command="your-command-here"
-
-# Check if backend is running
-gcloud compute ssh philosophy-bot-vm --zone=us-central1-a --command="ps aux | grep uvicorn"
-
-# View backend logs
-gcloud compute ssh philosophy-bot-vm --zone=us-central1-a --command="cat /home/runner/philosophy_video_generator/logs/backend.log"
-```
-
-### SSL/HTTPS Setup (Already Configured)
-- **Nginx** is installed as a reverse proxy on the VM
-- **Let's Encrypt** SSL certificate via certbot (auto-renews)
-- Config file: `/etc/nginx/sites-available/api.cofndrly.com`
-
-Nginx proxies:
-- `https://api.cofndrly.com` → `http://127.0.0.1:8001` (backend)
-
-To check nginx status:
-```bash
-gcloud compute ssh philosophy-bot-vm --zone=us-central1-a --command="sudo systemctl status nginx"
-```
-
-To reload nginx after config changes:
-```bash
-gcloud compute ssh philosophy-bot-vm --zone=us-central1-a --command="sudo nginx -t && sudo systemctl reload nginx"
-```
-
-### Static File Hosting
-The FastAPI backend serves static files for TikTok API access:
-- **Images**: Mounted at `/static/images/` → filesystem `generated_images/`
-- **Slides**: Mounted at `/static/slides/` → filesystem `generated_slideshows/`
-
-Example URLs:
-```
-https://api.cofndrly.com/static/images/King_Solomon_scene_1_nano.png
-https://api.cofndrly.com/static/slides/gpt15/Stoicism_slide_0.png
-```
-
-### Firewall Rules
-Ports 80 and 443 are open for HTTP/HTTPS traffic:
-```bash
-gcloud compute firewall-rules list --filter="name~http"
-```
-
-### TikTok Integration
-
-**⚠️ CRITICAL: ALL UPLOADS GO TO DRAFTS (USER'S INBOX)**
-- All TikTok uploads go to DRAFTS (user's inbox), never direct publish
-- User's TikTok account can be PUBLIC - sandbox mode works with public accounts for drafts
-- User completes and publishes the post from their TikTok app
-- NEVER change code to post directly to TikTok feed
-
-**Two Different Endpoints for Videos vs Photo Slideshows:**
-
-| Content Type | Endpoint | How to Send to Drafts | Backend File |
-|-------------|----------|----------------------|--------------|
-| **Videos** | `/v2/post/publish/inbox/video/init/` | Use this endpoint directly (it's the inbox endpoint) | `tiktok_cli.py`, `agent_tools.py`, `routers/tiktok.py` |
-| **Photo Slideshows** | `/v2/post/publish/content/init/` | Use `post_mode: "MEDIA_UPLOAD"` | `services/tiktok_poster.py` |
-
-**Video Uploads to Drafts:**
-```python
-# Endpoint for videos -> drafts
-INBOX_VIDEO_URL = "https://open.tiktokapis.com/v2/post/publish/inbox/video/init/"
-
-# Just use FILE_UPLOAD source, no post_mode needed
-payload = {
-    "source_info": {
-        "source": "FILE_UPLOAD",
-        "video_size": file_size,
-        "chunk_size": file_size,
-        "total_chunk_count": 1
-    }
-}
-```
-
-**Photo Slideshow Uploads to Drafts:**
-```python
-# Endpoint for photos (same endpoint, different mode)
-PHOTO_CONTENT_URL = "https://open.tiktokapis.com/v2/post/publish/content/init/"
-
-# CRITICAL: Use MEDIA_UPLOAD mode for drafts, NOT DIRECT_POST
-payload = {
-    "post_info": {
-        "title": caption,
-        "description": caption
-    },
-    "source_info": {
-        "source": "PULL_FROM_URL",
-        "photo_cover_index": 0,
-        "photo_images": ["https://...jpg", "https://...jpg"]  # Must be JPEG/WebP!
-    },
-    "post_mode": "MEDIA_UPLOAD",  # ✅ Sends to drafts (works with public accounts)
-    "media_type": "PHOTO"
-}
-# NEVER use "post_mode": "DIRECT_POST" - requires private account in sandbox
-```
-
-**Image Format for Photo Slideshows (CRITICAL):**
-- TikTok photo API only accepts **JPEG (.jpg)** or **WebP** format
-- **PNG files will FAIL** with `file_format_check_failed` error
-- Always generate/convert images to JPEG before posting to TikTok
-- The `tiktok_poster.py` automatically converts paths to .jpg URLs
-
-**Configuration:**
-- **Redirect URI**: `https://api.cofndrly.com/api/tiktok/callback`
-- **Domain Verification**: ✅ `api.cofndrly.com` is verified in TikTok Developer Portal
-- **Scopes**: `user.info.basic`, `video.upload`, `video.publish`
-- Tokens stored in `.tiktok_tokens.json` (gitignored)
-- Access tokens expire in 24 hours, refresh tokens last 365 days
-- Token refresh happens automatically in `tiktok_poster.py`
-
-**Key Backend Files:**
-- `backend/app/services/tiktok_poster.py` - Photo slideshow posting (MEDIA_UPLOAD mode)
-- `backend/app/routers/tiktok.py` - Video upload endpoints
-- `backend/app/services/agent_tools.py` - Agent's TikTok upload tool
-- `tiktok_cli.py` - CLI for manual uploads and auth
-
-TikTok CLI commands:
-```bash
-# Start OAuth flow
-python tiktok_cli.py auth
-
-# Exchange code for tokens
-python tiktok_cli.py token --code "YOUR_CODE"
-
-# Refresh expired access token (uses refresh token)
-python tiktok_cli.py refresh
-
-# Upload video to drafts
-python tiktok_cli.py upload --video "path/to/video.mp4" --title "Caption"
-
-# Upload photo slideshow to drafts (images must be JPEG, not PNG!)
-python tiktok_cli.py slideshow --images "img1.jpg,img2.jpg" --title "Caption"
-
-# Check upload status
-python tiktok_cli.py status --publish-id "PUBLISH_ID"
-
-# View config and token status
-python tiktok_cli.py info
-```
-
-### Frontend (Vercel) - Quick Reference
-- **URL:** `https://app.cofndrly.com`
-- **Login:** Username `sharoz75`, Password `rosebud`
-- **Auto-deploys** on `git push origin main` (see CI/CD section below)
-
-### Automation Scheduler
-The backend includes APScheduler for running automations:
-
-**How it works:**
-1. Scheduler starts with the backend app
-2. Loads all automations where `status="running"` and `is_active=True`
-3. Creates cron jobs based on `schedule_times` and `schedule_days`
-4. When triggered: generates slideshow → optionally posts to TikTok
-5. Tracks run history in `automation_runs` table
-
-**Key files:**
-- `backend/app/services/scheduler.py` - APScheduler service
-- `backend/app/services/tiktok_poster.py` - TikTok posting service
-- `backend/app/models/automation_run.py` - Run history model
-
-**API Endpoints:**
-```bash
-# Start/stop automation
-POST /api/automations/{id}/start
-POST /api/automations/{id}/stop
-
-# Trigger immediate run (for testing)
-POST /api/automations/{id}/run-now
-
-# View run history
-GET /api/automations/{id}/runs
-
-# Get scheduler status
-GET /api/automations/scheduler/status
-
-# Configure TikTok posting
-PUT /api/automations/{id}/tiktok-settings
-```
-
-**Enable TikTok auto-posting:**
-Set `post_to_tiktok: true` in automation settings to automatically post slideshows.
-
-### CI/CD Pipeline (Auto-Deploy on Git Push)
-
-The project has fully automated CI/CD - pushing to `main` deploys both frontend and backend:
-
-| Component | Platform | URL | Trigger |
-|-----------|----------|-----|---------|
-| **Backend** | GCP VM | `https://api.cofndrly.com` | GitHub Actions |
-| **Frontend** | Vercel | `https://app.cofndrly.com` | Vercel Git Integration |
-
-**Workflow:**
-```
-git push origin main
-    │
-    ├──► GitHub Actions (.github/workflows/deploy.yml)
-    │       └── SSH into GCP VM → git pull → restart uvicorn
-    │
-    └──► Vercel (auto-triggered)
-            └── Build from frontend/ directory → deploy to CDN
-```
-
-#### Backend Deployment (GitHub Actions → GCP)
-
-**File:** `.github/workflows/deploy.yml`
-
-**What it does:**
-1. SSHs into `philosophy-bot-vm` on GCP
-2. Pulls latest code from GitHub
-3. Installs any new Python dependencies
-4. Restarts the uvicorn server
-
-**Required GitHub Secrets:**
-- `GCP_SSH_KEY` - Private SSH key for the VM
-- `GCP_VM_IP` - External IP of the VM (23.251.149.244)
-
-**Manual deploy (if needed):**
-```bash
-gcloud compute ssh philosophy-bot-vm --zone=us-central1-a --command="cd /home/runner/philosophy_video_generator && git pull && pip install -r requirements.txt && sudo systemctl restart philosophy-backend"
-```
-
-#### Frontend Deployment (Vercel)
-
-**Vercel Project:** `frontend` under `sharozs-projects-b7468887`
-**Root Directory:** `frontend` (set in Vercel dashboard)
-**Framework:** Vite
-**Build Command:** `npm run build`
-**Output Directory:** `dist`
-
-**Environment Variables (set in Vercel dashboard):**
-- `VITE_API_URL=https://api.cofndrly.com`
-
-**Manual deploy (if needed):**
-```bash
-cd frontend
-npx vercel --prod
-```
-
-**Vercel CLI commands:**
-```bash
-npx vercel ls                    # List recent deployments
-npx vercel env ls                # List environment variables
-npx vercel logs <deployment-url> # View deployment logs
-npx vercel inspect <url>         # Inspect deployment details
-```
-
-#### Git Configuration
-
-**Important:** Use `sharoz75@gmail.com` as git author to avoid Vercel permission issues:
-```bash
-git config user.email "sharoz75@gmail.com"
-git config user.name "Sharoz Javaid"
-```
-
-#### Deployment Checklist
-
-Before pushing to production:
-1. ✅ Run `npm run build` in `frontend/` to check for TypeScript errors
-2. ✅ Test locally with `./dev.sh`
-3. ✅ Commit with descriptive message
-4. ✅ Push to main: `git push origin main`
-5. ✅ Monitor GitHub Actions: `gh run list --limit 3`
-6. ✅ Monitor Vercel: `cd frontend && npx vercel ls`
-
-## AI Agent & Gallery System
-
-### Agent Memory System
-
-The agent has a persistent memory system in `/memory/` that survives across sessions:
-
-**Memory Files:**
-```
-/memory/
-  ├── current_project.json     # Active project ID + session summary
-  ├── conversation_summary.txt # Rolling history of conversations
-  ├── insights.txt             # Agent's learned preferences/patterns
-  └── learnings/               # Category-specific learnings
-      └── fonts.json           # Font preferences, etc.
-```
-
-**Memory Tools (available to the agent):**
-| Tool | Purpose |
-|------|---------|
-| `get_session_context` | Load previous context at session start |
-| `save_session_context` | Save project ID + summary before ending |
-| `add_agent_insight` | Record learnings to insights.txt |
-| `store_learning` | Save category-specific learnings |
-| `get_learnings` | Retrieve past learnings |
-
-**Session Continuity Protocol (in system prompt):**
-1. Agent calls `get_session_context` at the START of every conversation
-2. If there's a saved project, agent acknowledges it
-3. Agent saves context with `save_session_context` before conversation ends
-4. Agent records insights with `add_agent_insight` when learning preferences
-
-**Example Flow:**
-```
-User: (starts new session)
-Agent: (calls get_session_context)
-       "Welcome back! Last time we were working on '5 Most Dangerous Men'..."
-
-User: "Post it to TikTok"
-Agent: (calls post_slideshow_to_tiktok)
-       (calls save_session_context with summary)
-```
-
-### Agent Page Architecture (`/frontend/src/pages/Agent.tsx`)
-The AI Agent page is a **full-page chat interface** with integrated gallery:
-
-**Layout:**
-- Uses full viewport height (`height: calc(100vh - 64px)`)
-- Header with logo, status badge, and Chat/Gallery tabs
-- Chat area with messages, tool calls, and slide previews
-- Input bar fixed at bottom of chat area (NOT page bottom)
-- Negative margins to break out of Layout padding
-
-**Key Features:**
-- **Tabs**: Chat tab for conversation, Gallery tab for all assets
-- **Streaming**: Uses SSE for real-time Claude responses
-- **Tool Calls**: Displays active tools while streaming
-- **Slide Previews**: Shows generated slides inline in chat
-- **Auto-save**: Slides automatically save to gallery when generated
-
-**State Management:**
-```typescript
-const [activeTab, setActiveTab] = useState<'chat' | 'gallery'>('chat');
-const [galleryFilter, setGalleryFilter] = useState<'all' | 'slides' | 'scripts' | 'drafts'>('all');
-const { items: galleryItems, stats, addSlide } = useGallery();
-```
-
-### Gallery System
-
-**Database Model (`/backend/app/models/gallery_item.py`):**
-```python
-class GalleryItem(Base):
-    __tablename__ = "gallery_items"
-    
-    id = Column(String(36), primary_key=True)
-    item_type = Column(String(50))  # 'slide', 'script', 'prompt', 'image', 'project'
-    project_id = Column(String(36), nullable=True)
-    slide_id = Column(String(36), nullable=True)
-    title = Column(String(255))
-    image_url = Column(String(500))
-    font = Column(String(50))
-    theme = Column(String(50))
-    content_style = Column(String(50))
-    extra_data = Column(JSON)  # NOTE: 'metadata' is reserved by SQLAlchemy!
-    status = Column(String(50))  # 'complete', 'draft', 'failed'
-    session_id = Column(String(36))
-```
-
-**⚠️ IMPORTANT**: Never use `metadata` as a column name in SQLAlchemy models - it's reserved!
-
-**API Endpoints (`/backend/app/routers/gallery.py`):**
-```bash
-GET  /api/gallery                    # List all items (supports filtering)
-POST /api/gallery                    # Create item
-GET  /api/gallery/{id}               # Get single item
-PUT  /api/gallery/{id}               # Update item
-DELETE /api/gallery/{id}             # Delete item
-DELETE /api/gallery                  # Clear all
-GET  /api/gallery/stats/summary      # Get statistics
-```
-
-**Frontend Context (`/frontend/src/context/GalleryContext.tsx`):**
-```typescript
-// Uses TanStack Query for API sync
-const { items, stats, addSlide, removeItem, hasItem, clearGallery } = useGallery();
-
-// addSlide converts SlidePreviewData to GalleryItem automatically
-await addSlide(slidePreviewData);
-```
-
-**Gallery Tab Filters:**
-- All: Shows everything
-- Slides: Only `item_type === 'slide'`
-- Scripts: `item_type === 'script'` or `'prompt'`
-- Drafts: `status === 'draft'`
-
-### Agent Streaming Protocol
-
-The agent uses Server-Sent Events (SSE) with these event types:
-
-```typescript
-type AgentStreamEvent =
-  | { type: 'session'; session_id: string }
-  | { type: 'text'; text: string }
-  | { type: 'thinking'; text: string }
-  | { type: 'tool_start'; tool_name: string; tool_input: Record<string, unknown> }
-  | { type: 'tool_result'; tool_name: string; result: Record<string, unknown>; success: boolean }
-  | { type: 'slide_preview'; slide: SlidePreviewData }
-  | { type: 'done'; iterations: number; tool_count: number }
-  | { type: 'error'; message: string };
-```
-
-**Usage in frontend:**
-```typescript
-cleanupRef.current = streamAgentMessage(
-  message,
-  sessionId,
-  handleStreamEvent,  // Processes each event
-  onError,
-  onComplete
-);
-```
-
-### Adding New Gallery Item Types
-
-1. Update `item_type` enum in model (already flexible - just use new string)
-2. Add filter option in Agent.tsx `galleryFilter` type
-3. Add filter button in Gallery tab
-4. Update `filteredGalleryItems` logic to handle new type
-
-### Key Files for Agent/Gallery
-- `/frontend/src/pages/Agent.tsx` - Main agent page with tabs
-- `/frontend/src/context/GalleryContext.tsx` - Gallery state with API sync
-- `/frontend/src/api/client.ts` - Gallery API functions
-- `/backend/app/models/gallery_item.py` - Database model
-- `/backend/app/routers/gallery.py` - API endpoints
-- `/backend/app/routers/agent.py` - Agent chat endpoints
 
 ## Code Style
 - Python: Follow PEP 8, use type hints
