@@ -311,3 +311,34 @@ def get_storage_service() -> CloudStorageService:
     if _storage_service is None:
         _storage_service = CloudStorageService()
     return _storage_service
+
+
+def upload_video_to_gcs(local_path: str, delete_local: bool = False) -> Optional[str]:
+    """
+    Upload a video file to GCS and optionally delete the local copy.
+    
+    Args:
+        local_path: Path to the local video file
+        delete_local: If True, delete the local file after successful upload
+    
+    Returns:
+        Public URL of the uploaded video, or None if upload fails
+    """
+    storage = get_storage_service()
+    
+    if not storage.is_available:
+        print(f"⚠️ GCS not available, keeping video locally: {local_path}")
+        return None
+    
+    # Upload to videos/ folder
+    public_url = storage.upload_file(local_path, destination_folder="videos")
+    
+    if public_url and delete_local:
+        try:
+            import os
+            os.remove(local_path)
+            print(f"🗑️ Deleted local video after upload: {local_path}")
+        except Exception as e:
+            print(f"⚠️ Could not delete local file: {e}")
+    
+    return public_url

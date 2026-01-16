@@ -1,6 +1,6 @@
 from moviepy.editor import *
 import os
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 import json
 import numpy as np
 
@@ -8,6 +8,14 @@ import numpy as np
 import PIL.Image
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
+
+# Import cloud storage for video upload
+try:
+    from .cloud_storage import upload_video_to_gcs
+    GCS_UPLOAD_AVAILABLE = True
+except ImportError:
+    GCS_UPLOAD_AVAILABLE = False
+    print("⚠️ Cloud storage not available for video uploads")
 
 
 # ============= TRANSITION EFFECTS =============
@@ -229,7 +237,19 @@ class VideoAssembler:
             )
             
             print(f"Video created successfully: {output_path}")
-            return output_path
+            
+            # Upload to Google Cloud Storage (production)
+            gcs_url = None
+            if GCS_UPLOAD_AVAILABLE:
+                print("📤 Uploading video to Cloud Storage...")
+                gcs_url = upload_video_to_gcs(output_path, delete_local=False)
+                if gcs_url:
+                    print(f"☁️ Video uploaded to GCS: {gcs_url}")
+                else:
+                    print("⚠️ GCS upload failed, keeping local copy")
+            
+            # Return GCS URL if available, otherwise local path
+            return gcs_url if gcs_url else output_path
             
         except Exception as e:
             print(f"Error creating video: {e}")
@@ -322,7 +342,15 @@ class VideoAssembler:
             video.close()
             optimized_video.close()
             
-            return optimized_path
+            # Upload to Google Cloud Storage (production)
+            gcs_url = None
+            if GCS_UPLOAD_AVAILABLE:
+                print("📤 Uploading optimized video to Cloud Storage...")
+                gcs_url = upload_video_to_gcs(optimized_path, delete_local=False)
+                if gcs_url:
+                    print(f"☁️ Optimized video uploaded to GCS: {gcs_url}")
+            
+            return gcs_url if gcs_url else optimized_path
             
         except Exception as e:
             print(f"Error optimizing for TikTok: {e}")
