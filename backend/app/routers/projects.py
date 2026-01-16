@@ -1,6 +1,6 @@
 """Projects API router - CRUD operations for projects."""
 import logging
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -234,4 +234,150 @@ async def post_project_to_tiktok(
         raise
     except Exception as e:
         logger.exception(f"Error posting to TikTok: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class InstagramPostRequest(BaseModel):
+    """Request body for posting to Instagram."""
+    caption: Optional[str] = None
+    hashtags: Optional[List[str]] = None
+
+
+@router.post("/{project_id}/post-to-instagram")
+async def post_project_to_instagram(
+    project_id: str,
+    request: InstagramPostRequest,
+    db: Session = Depends(get_db)
+):
+    """Post a project's slideshow to Instagram via Post Bridge.
+    
+    This sends all completed slide images to Instagram as a carousel.
+    Unlike TikTok, this posts directly (not to drafts).
+    
+    Required hashtag: #philosophizemeapp is always included.
+    """
+    from ..services.instagram_poster import InstagramPoster
+    
+    # Get the project
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Get all slides sorted by order
+    slides = sorted(project.slides, key=lambda s: s.order_index)
+    
+    # Get completed slides with images
+    completed_slides = [s for s in slides if s.image_status == "complete" and s.final_image_path]
+    
+    if len(completed_slides) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Need at least 2 completed slide images to create an Instagram carousel"
+        )
+    
+    if len(completed_slides) > 10:
+        # Instagram max is 10 images per carousel
+        completed_slides = completed_slides[:10]
+    
+    # Get image paths
+    image_paths = [s.final_image_path for s in completed_slides]
+    
+    # Build caption
+    caption = request.caption or project.topic or project.name or "Philosophy Slideshow"
+    
+    # Build hashtags - ALWAYS include #philosophizemeapp
+    hashtags = request.hashtags or ["philosophy", "wisdom", "stoicism", "motivation", "mindset"]
+    # Ensure philosophizemeapp is always first
+    if "philosophizemeapp" not in hashtags:
+        hashtags = ["philosophizemeapp"] + hashtags
+    elif hashtags[0] != "philosophizemeapp":
+        hashtags.remove("philosophizemeapp")
+        hashtags = ["philosophizemeapp"] + hashtags
+    
+    logger.info(f"Posting project {project_id} to Instagram: {len(image_paths)} images, caption='{caption[:50]}...'")
+    logger.info(f"Hashtags: {hashtags}")
+    
+    # Post to Instagram
+    try:
+        poster = InstagramPoster()
+        
+        # Check connection first
+        status = poster.check_connection()
+        if not status.get("success"):
+            raise HTTPException(
+                status_code=401,
+                detail="Instagram not connected via Post Bridge. Connect at https://post-bridge.com/dashboard"
+            )
+        
+        result = poster.post_carousel(
+            image_paths=image_paths,
+            caption=caption,
+            hashtags=hashtags,
+            upload_files=True
+        )
+        
+        if result.get("success"):
+            logger.info(f"Successfully posted to Instagram: post_id={result.get('post_id')}")
+            return {
+                "success": True,
+                "post_id": result.get("post_id"),
+                "image_count": len(image_paths),
+                "hashtags": hashtags,
+                "status": result.get("status", "processing"),
+                "message": f"Carousel with {len(image_paths)} images posted to Instagram!"
+            }
+        else:
+            error_msg = result.get("error", "Unknown error")
+            logger.error(f"Instagram post failed: {error_msg}")
+            return {
+                "success": False,
+                "error": error_msg
+            }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error posting to Instagram: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{project_id}/instagram-status/{post_id}")
+async def get_instagram_post_status(
+    project_id: str,
+    post_id: str,
+    db: Session = Depends(get_db)
+):
+    """Check the status of an Instagram post."""
+    from ..services.instagram_poster import InstagramPoster
+    
+    try:
+        poster = InstagramPoster()
+        
+        # Get post status
+        status_result = poster.get_post_status(post_id)
+        if not status_result.get("success"):
+            return status_result
+        
+        # Get post results
+        results_result = poster.get_post_results(post_id)
+        
+        response = {
+            "success": True,
+            "post_id": post_id,
+            "status": status_result.get("status"),
+            "created_at": status_result.get("created_at")
+        }
+        
+        # Add URL if available
+        if results_result.get("success"):
+            for r in results_result.get("results", []):
+                platform_data = r.get("platform_data") or {}
+                if platform_data.get("url"):
+                    response["instagram_url"] = platform_data.get("url")
+                    break
+        
+        return response
+        
+    except Exception as e:
+        logger.exception(f"Error checking Instagram post status: {e}")
         raise HTTPException(status_code=500, detail=str(e))

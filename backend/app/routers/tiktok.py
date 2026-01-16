@@ -1,23 +1,31 @@
 """TikTok OAuth and Content Posting API router."""
 import os
+import io
 import json
 import secrets
 import hashlib
 import base64
+import uuid
 import requests
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
-from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from typing import Optional, List
+from fastapi import APIRouter, HTTPException, Query, Request, UploadFile, File, Form
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from PIL import Image
+
+from ..config import get_settings
+
+settings = get_settings()
 
 # Load .env file from project root
 env_path = Path(__file__).parent.parent.parent.parent / ".env"
 load_dotenv(env_path)
 
 router = APIRouter()
+public_router = APIRouter()  # Public router for TikTok media - no auth required
 
 # Token storage path
 TOKEN_FILE = Path(__file__).parent.parent.parent.parent / ".tiktok_tokens.json"
@@ -477,3 +485,104 @@ async def disconnect_tiktok():
     if PKCE_FILE.exists():
         PKCE_FILE.unlink()
     return {"status": "success", "message": "TikTok disconnected"}
+
+
+@public_router.get("/media/{image_id}")
+async def serve_tiktok_media(image_id: str):
+    """Serve TikTok media images from our verified domain.
+    
+    TikTok requires URL ownership verification for PULL_FROM_URL.
+    Since api.cofndrly.com is verified, we serve images from here.
+    
+    URL format: /api/tiktok/media/{filename.jpg}
+    Images are stored in: generated_tiktok_media/
+    
+    This endpoint is PUBLIC (no auth) so TikTok can fetch the images.
+    """
+    # Define media directory
+    tiktok_media_dir = settings.base_dir / "generated_tiktok_media"
+    
+    # Security: prevent directory traversal
+    if ".." in image_id or "/" in image_id or "\\" in image_id:
+        raise HTTPException(status_code=400, detail="Invalid image ID")
+    
+    image_path = tiktok_media_dir / image_id
+    
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail=f"Image not found: {image_id}")
+    
+    # Read and serve the image
+    try:
+        with open(image_path, "rb") as f:
+            image_data = f.read()
+        
+        return Response(
+            content=image_data,
+            media_type="image/jpeg",
+            headers={
+                "Cache-Control": "public, max-age=86400",  # Cache for 1 day
+                "Access-Control-Allow-Origin": "*"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read image: {str(e)}")
+
+
+@router.post("/upload-media")
+async def upload_tiktok_media(
+    file: UploadFile = File(...),
+    filename: Optional[str] = Form(None)
+):
+    """Upload an image for TikTok posting.
+    
+    This endpoint:
+    1. Accepts image files (PNG, JPEG, etc.)
+    2. Converts to JPEG (required by TikTok)
+    3. Saves to generated_tiktok_media/ folder
+    4. Returns the public URL that TikTok can access
+    
+    The returned URL is on our verified domain (api.cofndrly.com).
+    """
+    # Create media directory
+    tiktok_media_dir = settings.base_dir / "generated_tiktok_media"
+    tiktok_media_dir.mkdir(parents=True, exist_ok=True)
+    
+    try:
+        # Read the uploaded file
+        contents = await file.read()
+        
+        # Open with PIL and convert to JPEG
+        with Image.open(io.BytesIO(contents)) as img:
+            # Convert to RGB if necessary (PNG might have alpha)
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Generate unique filename
+            base_name = filename or file.filename or "image"
+            base_name = Path(base_name).stem  # Remove extension
+            unique_id = uuid.uuid4().hex[:8]
+            output_filename = f"{base_name}_{unique_id}.jpg"
+            output_path = tiktok_media_dir / output_filename
+            
+            # Save as JPEG
+            img.save(output_path, format='JPEG', quality=95)
+        
+        # Return the public URL
+        # This will be accessible at https://api.cofndrly.com/api/tiktok/media/{filename}
+        public_url = f"/api/tiktok/media/{output_filename}"
+        
+        return {
+            "success": True,
+            "filename": output_filename,
+            "public_url": public_url,
+            "full_url": f"https://api.cofndrly.com{public_url}"
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process image: {str(e)}")

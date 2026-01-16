@@ -1,7 +1,13 @@
 """TikTok posting service for automations.
 
 Handles posting photo slideshows to TikTok using the Content Posting API.
-Uses PULL_FROM_URL method to fetch images from our server.
+Uses PULL_FROM_URL method to fetch images from our verified domain.
+
+IMPORTANT: TikTok only accepts JPEG/WebP format - NOT PNG!
+When posting local images, we:
+1. Upload to the production server at api.cofndrly.com
+2. Server converts PNG → JPEG automatically
+3. Use those public URLs for TikTok (domain is verified)
 """
 import os
 import json
@@ -22,7 +28,7 @@ TOKEN_FILE = PROJECT_ROOT / ".tiktok_tokens.json"
 PHOTO_INIT_URL = "https://open.tiktokapis.com/v2/post/publish/content/init/"
 STATUS_URL = "https://open.tiktokapis.com/v2/post/publish/status/fetch/"
 
-# Base URL for serving images (from api.cofndrly.com)
+# Base URL for serving images - MUST be api.cofndrly.com (verified in TikTok Developer Portal)
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.cofndrly.com")
 
 
@@ -36,6 +42,9 @@ class TikTokPoster:
             logger.info(f"Tokens loaded: open_id={self.tokens.get('open_id')}, scope={self.tokens.get('scope')}")
         else:
             logger.warning(f"No tokens found at {TOKEN_FILE}")
+        
+        # Log upload endpoint for debugging
+        self._init_gcs()
     
     def _load_tokens(self) -> Optional[dict]:
         """Load TikTok tokens from file."""
@@ -50,6 +59,75 @@ class TikTokPoster:
                 logger.error(f"Failed to load tokens: {e}")
                 return None
         return None
+    
+    def _init_gcs(self):
+        """Initialize storage for uploading local images.
+        
+        This is needed when running locally because:
+        1. Local images aren't accessible via public URLs
+        2. TikTok needs to PULL images from public URLs
+        3. We upload to the production server at api.cofndrly.com
+        
+        Note: We now upload to our own server instead of GCS because
+        api.cofndrly.com is verified in TikTok Developer Portal.
+        """
+        # We use HTTP upload to production server instead of GCS
+        # The endpoint is /api/tiktok/upload-media
+        logger.info(f"TikTok poster will upload images to: {API_BASE_URL}/api/tiktok/upload-media")
+    
+    def _upload_image_to_server(self, local_path: str) -> Optional[str]:
+        """Upload a local image to the production server and return public URL.
+        
+        The production server at api.cofndrly.com is verified in TikTok Developer Portal,
+        so TikTok can pull images from there.
+        
+        Args:
+            local_path: Path to local image file
+            
+        Returns:
+            Public URL of the uploaded JPEG image, or None if failed
+        """
+        path = Path(local_path)
+        if not path.exists():
+            logger.error(f"Local image not found: {local_path}")
+            return None
+        
+        try:
+            # Read the image file
+            with open(path, 'rb') as f:
+                file_data = f.read()
+            
+            # Upload to production server
+            upload_url = f"{API_BASE_URL}/api/tiktok/upload-media"
+            
+            files = {
+                'file': (path.name, file_data, 'image/png')
+            }
+            data = {
+                'filename': path.stem
+            }
+            
+            logger.info(f"Uploading {path.name} to {upload_url}...")
+            response = requests.post(upload_url, files=files, data=data, timeout=60)
+            
+            if response.status_code != 200:
+                logger.error(f"Upload failed: {response.status_code} - {response.text}")
+                return None
+            
+            result = response.json()
+            
+            if result.get("success"):
+                # The server returns the full URL
+                public_url = result.get("full_url")
+                logger.info(f"✅ Uploaded to server: {public_url}")
+                return public_url
+            else:
+                logger.error(f"Upload failed: {result}")
+                return None
+            
+        except Exception as e:
+            logger.exception(f"Failed to upload image to server: {e}")
+            return None
     
     def is_authenticated(self) -> bool:
         """Check if we have valid tokens."""
@@ -104,26 +182,44 @@ class TikTokPoster:
         
         return True
     
-    def _get_image_url(self, image_path: str) -> str:
+    def _get_image_url(self, image_path: str) -> Optional[str]:
         """Convert local image path to public URL.
         
         IMPORTANT: TikTok only accepts JPEG or WebP format, NOT PNG.
-        This method will return .jpg URL if available.
         
-        Image paths look like:
-        - generated_slideshows/gpt15/Topic_Name_gpt15_slide_0.png
-        - generated_images/topic_scene_1.png
-        - /full/path/to/generated_slideshows/gpt15/Topic_Name_gpt15_slide_0.png
+        Strategy:
+        1. If it's already a GCS URL (https://storage.googleapis.com/...), use as-is
+        2. If it's a local file, upload to GCS as JPEG and return GCS URL
+        3. If it's a production path, construct api.cofndrly.com URL
         
-        URL structure:
-        - /static/slideshows/gpt15/filename.jpg -> generated_slideshows/gpt15/
-        - /static/slides/filename.jpg -> generated_slides/
-        - /static/images/filename.jpg -> generated_images/
+        Returns:
+            Public URL accessible by TikTok, or None if failed
         """
+        # Already a GCS URL
+        if image_path.startswith("https://storage.googleapis.com/"):
+            # Ensure it's JPEG
+            if image_path.endswith('.png'):
+                logger.warning(f"GCS URL is PNG, TikTok may reject: {image_path}")
+            return image_path
+        
+        # Already an HTTP URL (assume it's accessible)
+        if image_path.startswith("http://") or image_path.startswith("https://"):
+            return image_path
+        
         path = Path(image_path)
         
-        # TikTok requires JPEG/WebP - prefer .jpg extension
-        # Always use .jpg extension for TikTok (PNG is NOT supported)
+        # If it's a local file that exists, upload to production server
+        if path.exists():
+            logger.info(f"Local file detected, uploading to production server: {image_path}")
+            server_url = self._upload_image_to_server(image_path)
+            if server_url:
+                return server_url
+            else:
+                logger.error(f"Failed to upload local file to server: {image_path}")
+                return None
+        
+        # It's a relative path that doesn't exist locally - construct production URL
+        # This happens when running on production where paths are relative
         jpg_filename = path.stem + ".jpg"
         
         # Check if it's in generated_slideshows (automation-generated)
@@ -183,8 +279,13 @@ class TikTokPoster:
         if len(image_paths) > 35:
             return {"success": False, "error": "Maximum 35 images allowed"}
         
-        # Convert local paths to public URLs
-        image_urls = [self._get_image_url(path) for path in image_paths]
+        # Convert local paths to public URLs (uploads to GCS if local files)
+        image_urls = []
+        for path in image_paths:
+            url = self._get_image_url(path)
+            if url is None:
+                return {"success": False, "error": f"Failed to get URL for image: {path}"}
+            image_urls.append(url)
         
         logger.info(f"Posting {len(image_urls)} images to TikTok DRAFTS (MEDIA_UPLOAD mode)")
         logger.debug(f"Image URLs: {image_urls}")
