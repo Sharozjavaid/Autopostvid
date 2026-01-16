@@ -691,6 +691,53 @@ USE THIS WHEN: User wants to see past runs and their success/failure status.""",
         },
         "category": "automations"
     },
+    {
+        "name": "update_automation_social_settings",
+        "description": """Update social media posting settings for an automation.
+
+USE THIS WHEN: User wants to enable/disable posting to TikTok or Instagram for an automation.
+AVAILABLE PLATFORMS: TikTok, Instagram
+NOTE: Both platforms can be enabled at the same time - automation will post to both.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "automation_id": {
+                    "type": "string",
+                    "description": "The automation ID"
+                },
+                "post_to_tiktok": {
+                    "type": "boolean",
+                    "description": "Whether to post to TikTok when automation runs",
+                    "default": False
+                },
+                "post_to_instagram": {
+                    "type": "boolean",
+                    "description": "Whether to post to Instagram when automation runs",
+                    "default": False
+                }
+            },
+            "required": ["automation_id"]
+        },
+        "category": "automations"
+    },
+    {
+        "name": "get_automation_social_settings",
+        "description": """Get current social media posting settings for an automation.
+
+USE THIS WHEN: User asks which platforms an automation posts to.
+RETURNS: Current TikTok and Instagram posting status.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "automation_id": {
+                    "type": "string",
+                    "description": "The automation ID"
+                }
+            },
+            "required": ["automation_id"]
+        },
+        "category": "automations"
+    },
 
     # -------------------------------------------------------------------------
     # SETTINGS & INFO TOOLS
@@ -905,6 +952,8 @@ class ToolExecutor:
             "run_automation_now": self._run_automation_now,
             "add_topics_to_automation": self._add_topics_to_automation,
             "get_automation_runs": self._get_automation_runs,
+            "update_automation_social_settings": self._update_automation_social_settings,
+            "get_automation_social_settings": self._get_automation_social_settings,
             # Settings tools
             "list_fonts": self._list_fonts,
             "list_content_types": self._list_content_types,
@@ -2154,6 +2203,65 @@ class ToolExecutor:
                 "automation_id": automation_id,
                 "runs": [run.to_dict() for run in runs],
                 "total": len(runs)
+            }
+        finally:
+            db.close()
+    
+    async def _update_automation_social_settings(
+        self,
+        automation_id: str,
+        post_to_tiktok: bool = None,
+        post_to_instagram: bool = None
+    ) -> Dict[str, Any]:
+        """Update social media posting settings for an automation."""
+        db = self.get_db()
+        try:
+            automation = db.query(Automation).filter(Automation.id == automation_id).first()
+            if not automation:
+                return {"success": False, "error": "Automation not found"}
+            
+            settings = automation.settings or {}
+            
+            # Only update if provided
+            if post_to_tiktok is not None:
+                settings["post_to_tiktok"] = post_to_tiktok
+            if post_to_instagram is not None:
+                settings["post_to_instagram"] = post_to_instagram
+            
+            automation.settings = settings
+            db.commit()
+            
+            return {
+                "success": True,
+                "automation_id": automation_id,
+                "automation_name": automation.name,
+                "post_to_tiktok": settings.get("post_to_tiktok", False),
+                "post_to_instagram": settings.get("post_to_instagram", False),
+                "message": f"Social settings updated for '{automation.name}'"
+            }
+        finally:
+            db.close()
+    
+    async def _get_automation_social_settings(
+        self,
+        automation_id: str
+    ) -> Dict[str, Any]:
+        """Get social media posting settings for an automation."""
+        db = self.get_db()
+        try:
+            automation = db.query(Automation).filter(Automation.id == automation_id).first()
+            if not automation:
+                return {"success": False, "error": "Automation not found"}
+            
+            settings = automation.settings or {}
+            
+            return {
+                "success": True,
+                "automation_id": automation_id,
+                "automation_name": automation.name,
+                "post_to_tiktok": settings.get("post_to_tiktok", False),
+                "post_to_instagram": settings.get("post_to_instagram", False),
+                "post_to_drafts": settings.get("post_to_drafts", True)
             }
         finally:
             db.close()
