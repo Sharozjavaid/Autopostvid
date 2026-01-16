@@ -9,9 +9,8 @@ import GlassCard from '../components/GlassCard';
 import { 
   browseStorage, 
   getStorageStats, 
-  StorageItem, 
-  StorageStats 
 } from '../api/client';
+import type { StorageItem, StorageStats } from '../api/client';
 
 type FilterType = 'all' | 'video' | 'image' | 'audio';
 
@@ -102,7 +101,7 @@ export default function MediaLibrary() {
           gap: '16px',
           marginBottom: '24px',
         }}>
-          <GlassCard padding="compact">
+          <GlassCard padding="sm">
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
                 width: '40px',
@@ -122,7 +121,7 @@ export default function MediaLibrary() {
             </div>
           </GlassCard>
           
-          <GlassCard padding="compact">
+          <GlassCard padding="sm">
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
                 width: '40px',
@@ -143,7 +142,7 @@ export default function MediaLibrary() {
           </GlassCard>
 
           {Object.entries(stats.folders).map(([folder, data]) => (
-            <GlassCard key={folder} padding="compact">
+            <GlassCard key={folder} padding="sm">
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
                   width: '40px',
