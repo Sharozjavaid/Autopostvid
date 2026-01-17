@@ -534,6 +534,139 @@ RETURNS: Post status and URL if published.""",
     },
 
     # -------------------------------------------------------------------------
+    # IMAGE-TO-VIDEO TOOLS (MiniMax Hailuo-02)
+    # -------------------------------------------------------------------------
+    {
+        "name": "generate_video_transition",
+        "description": """Generate a cinematic video transition between two images using AI.
+
+MODEL: MiniMax Hailuo-02 (fal-ai/minimax/hailuo-02/standard/image-to-video)
+COST: ~$0.27 per 6-second clip ($0.045/second)
+
+CAPABILITIES:
+- Takes a START frame and END frame, generates smooth motion between them
+- Prompt-guided: describe HOW the transition should look/feel
+- Duration: 5 or 6 seconds per clip
+- Resolution: 768P (faster) or 1080P (higher quality)
+
+USE THIS WHEN:
+- User wants to bring slides/images to life with motion
+- Creating cinematic transitions between scenes
+- Building a narration video with flowing visuals
+
+PROMPT TIPS:
+- Describe camera movement: "slow dolly in", "gentle pan left", "subtle zoom"
+- Describe mood: "dramatic lighting", "ethereal glow", "flickering candlelight"
+- Describe effects: "dust particles floating", "smoke wisps", "light rays"
+- Keep subject relatively still, let camera/atmosphere do the motion
+
+EXAMPLE PROMPTS:
+- "Ancient philosopher in candlelit study, camera slowly dollies in as dust particles float through golden light beams"
+- "Stoic emperor gazing at horizon, subtle camera movement, dramatic clouds drifting slowly"
+- "Wise sage meditating, gentle breathing motion, incense smoke curling upward"
+
+NOTE: This generates a SINGLE clip between 2 images. For a full video with multiple scenes, use generate_narration_video.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "start_image": {
+                    "type": "string",
+                    "description": "Path or URL to the starting frame image"
+                },
+                "end_image": {
+                    "type": "string",
+                    "description": "Path or URL to the ending frame image"
+                },
+                "prompt": {
+                    "type": "string",
+                    "description": "Description of the motion, camera movement, and atmosphere for the transition"
+                },
+                "duration": {
+                    "type": "string",
+                    "description": "Duration in seconds: '5' or '6'",
+                    "default": "6"
+                }
+            },
+            "required": ["start_image", "end_image", "prompt"]
+        },
+        "category": "video"
+    },
+    {
+        "name": "generate_narration_video",
+        "description": """Generate a full narration video with cinematic transitions between ALL images.
+
+MODEL: MiniMax Hailuo-02 (fal-ai/minimax/hailuo-02/standard/image-to-video)
+COST: ~$0.27 per clip × (N-1) clips for N images
+      Example: 6 images = 5 clips = ~$1.35
+
+This creates a flowing cinematic video where each scene transitions smoothly into the next.
+Perfect for philosophical narration content.
+
+USE THIS WHEN:
+- User has a project with generated slides and wants a cinematic video
+- Creating documentary-style philosophical content
+- Turning a static slideshow into an immersive visual experience
+
+PROMPT STYLES:
+- "documentary": Dramatic, candlelit atmosphere with TV static glitch effects (epic/artistic)
+- "default": Clean, subtle camera movements (professional/minimal)
+
+HOW IT WORKS:
+1. For N images, generates N-1 transition clips
+2. Each clip starts on image[i] and ends on image[i+1]
+3. Clips can be concatenated for seamless playback
+4. Each clip is 5-6 seconds long
+
+EXAMPLE:
+6 slideshow images → 5 transition clips → ~30 seconds of cinematic video
+
+NOTE: This is computationally expensive. For testing, try generate_video_transition with just 2 images first.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "image_paths": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of image paths in order (needs at least 2)"
+                },
+                "scene_descriptions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional descriptions for each transition (what motion/mood for each scene change)"
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Name for the output video",
+                    "default": "narration_video"
+                },
+                "duration_per_scene": {
+                    "type": "string",
+                    "description": "Duration for each clip: '5' or '6'",
+                    "default": "6"
+                },
+                "prompt_style": {
+                    "type": "string",
+                    "description": "Style: 'documentary' (dramatic with effects) or 'default' (clean/subtle)",
+                    "default": "documentary"
+                }
+            },
+            "required": ["image_paths"]
+        },
+        "category": "video"
+    },
+    {
+        "name": "get_video_capabilities",
+        "description": """Get information about the image-to-video AI model and its capabilities.
+
+USE THIS WHEN: User asks what video generation can do, or you need to explain the feature.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {}
+        },
+        "category": "video"
+    },
+
+    # -------------------------------------------------------------------------
     # AUTOMATION TOOLS
     # -------------------------------------------------------------------------
     {
@@ -944,6 +1077,10 @@ class ToolExecutor:
             "check_instagram_status": self._check_instagram_status,
             "post_slideshow_to_instagram": self._post_slideshow_to_instagram,
             "get_instagram_post_status": self._get_instagram_post_status,
+            # Video tools
+            "generate_video_transition": self._generate_video_transition,
+            "generate_narration_video": self._generate_narration_video,
+            "get_video_capabilities": self._get_video_capabilities,
             # Automation tools
             "list_automations": self._list_automations,
             "create_automation": self._create_automation,
@@ -2007,6 +2144,138 @@ class ToolExecutor:
             
         except Exception as e:
             return {"success": False, "error": f"Failed to check post status: {str(e)}"}
+    
+    # -------------------------------------------------------------------------
+    # VIDEO TOOL IMPLEMENTATIONS (Image-to-Video with MiniMax Hailuo-02)
+    # -------------------------------------------------------------------------
+    
+    async def _generate_video_transition(
+        self,
+        start_image: str,
+        end_image: str,
+        prompt: str,
+        duration: str = "6"
+    ) -> Dict[str, Any]:
+        """Generate a single video transition between two images."""
+        try:
+            from .image_to_video import get_image_to_video_service
+            
+            service = get_image_to_video_service()
+            result = service.generate_single_transition(
+                start_image=start_image,
+                end_image=end_image,
+                prompt=prompt,
+                duration=duration
+            )
+            
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "video_path": result.get("video_path"),
+                    "video_url": result.get("video_url"),
+                    "duration_seconds": result.get("duration_seconds"),
+                    "message": f"Generated {duration}-second transition video"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": result.get("error", "Unknown error generating video")
+                }
+                
+        except Exception as e:
+            return {"success": False, "error": f"Failed to generate video transition: {str(e)}"}
+    
+    async def _generate_narration_video(
+        self,
+        image_paths: List[str],
+        scene_descriptions: List[str] = None,
+        title: str = "narration_video",
+        duration_per_scene: str = "6",
+        prompt_style: str = "documentary"
+    ) -> Dict[str, Any]:
+        """Generate a full narration video with transitions between all images."""
+        try:
+            from .image_to_video import get_image_to_video_service
+            
+            if len(image_paths) < 2:
+                return {"success": False, "error": "Need at least 2 images to create a narration video"}
+            
+            service = get_image_to_video_service()
+            result = service.generate_narration_video(
+                image_paths=image_paths,
+                scene_descriptions=scene_descriptions,
+                title=title,
+                duration_per_scene=duration_per_scene,
+                prompt_style=prompt_style
+            )
+            
+            num_clips = result.get("total_clips", 0)
+            successful = result.get("successful_clips", 0)
+            total_duration = result.get("total_duration_seconds", 0)
+            
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "title": title,
+                    "total_clips_generated": successful,
+                    "total_duration_seconds": total_duration,
+                    "video_paths": result.get("video_paths", []),
+                    "clips": result.get("clips", []),
+                    "message": f"Generated {successful}/{num_clips} clips for ~{total_duration}s narration video"
+                }
+            else:
+                return {
+                    "success": False,
+                    "clips_generated": successful,
+                    "clips_failed": num_clips - successful,
+                    "clips": result.get("clips", []),
+                    "error": f"Some clips failed: {successful}/{num_clips} successful"
+                }
+                
+        except Exception as e:
+            return {"success": False, "error": f"Failed to generate narration video: {str(e)}"}
+    
+    async def _get_video_capabilities(self) -> Dict[str, Any]:
+        """Get information about the image-to-video AI model."""
+        return {
+            "success": True,
+            "model": "MiniMax Hailuo-02",
+            "model_id": "fal-ai/minimax/hailuo-02/standard/image-to-video",
+            "provider": "fal.ai",
+            "capabilities": {
+                "start_and_end_frames": True,
+                "prompt_guided_motion": True,
+                "durations": ["5 seconds", "6 seconds"],
+                "resolutions": ["768P (faster)", "1080P (higher quality)"]
+            },
+            "cost": {
+                "per_second": 0.045,
+                "per_6s_clip": 0.27,
+                "example_6_images": "5 clips × $0.27 = $1.35"
+            },
+            "prompt_styles": {
+                "documentary": "Dramatic candlelit atmosphere with TV static glitch effects - epic and artistic",
+                "default": "Clean, subtle camera movements - professional and minimal"
+            },
+            "best_for": [
+                "Bringing philosophical slideshow images to life",
+                "Creating cinematic scene transitions",
+                "Documentary-style narration videos",
+                "Adding subtle motion to static content"
+            ],
+            "prompt_tips": [
+                "Describe camera movement: 'slow dolly in', 'gentle pan', 'subtle zoom'",
+                "Describe atmosphere: 'dust particles', 'flickering candlelight', 'smoke wisps'",
+                "Keep subjects relatively still - let camera and atmosphere create motion",
+                "Similar image compositions transition more smoothly"
+            ],
+            "limitations": [
+                "5-6 seconds per clip (not adjustable)",
+                "Works best with consistent style between images",
+                "Complex motion may look unnatural",
+                "Processing takes 30-60 seconds per clip"
+            ]
+        }
     
     # -------------------------------------------------------------------------
     # AUTOMATION TOOL IMPLEMENTATIONS
