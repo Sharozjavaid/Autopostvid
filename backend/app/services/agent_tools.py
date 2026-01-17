@@ -673,6 +673,219 @@ USE THIS WHEN: User asks what video generation can do, or you need to explain th
     },
 
     # -------------------------------------------------------------------------
+    # VOICE/NARRATION TOOLS (ElevenLabs)
+    # -------------------------------------------------------------------------
+    {
+        "name": "generate_voiceover",
+        "description": """Generate a voiceover/narration audio file using ElevenLabs.
+
+YOU write the narration script. The AI reads it with a professional voice.
+
+MODEL: ElevenLabs eleven_turbo_v2_5 | COST: ~$0.30 per 1000 characters
+
+USE THIS WHEN:
+- User wants audio narration for their video
+- Creating a philosophical narration video
+- Adding voice to a slideshow
+
+YOUR SCRIPT should be:
+- Written for SPOKEN delivery (short sentences, natural rhythm)
+- Include the full text the voice should read
+- Timing: ~2.5 words per second, ~150 words per minute
+
+VOICE OPTIONS (pass voice_id):
+- "onwK4e9ZLuTAKqWW03F9" (default) - Philosophy Narrator
+- "pNInz6obpgDQGcFmaJgB" - Adam (deep, authoritative)
+- "ErXwobaYiN019PkySvjV" - Antoni (warm, narrative)
+- "21m00Tcm4TlvDq8ikWAM" - Rachel (calm, soothing)
+
+RETURNS: Path to the generated MP3 audio file.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "script": {
+                    "type": "string",
+                    "description": "The full narration text to be spoken. Write for voice delivery."
+                },
+                "voice_id": {
+                    "type": "string",
+                    "description": "ElevenLabs voice ID (optional, defaults to Philosophy Narrator)"
+                },
+                "filename": {
+                    "type": "string",
+                    "description": "Output filename (optional, without path)"
+                }
+            },
+            "required": ["script"]
+        },
+        "category": "voice"
+    },
+    {
+        "name": "generate_voiceover_with_timestamps",
+        "description": """Generate voiceover with word-level timing for precise scene synchronization.
+
+Like generate_voiceover, but also returns timestamps for each word and scene.
+Use this when you need to sync video clips to narration precisely.
+
+RETURNS:
+- audio_path: Path to MP3 file
+- total_duration: Total audio length in seconds
+- scene_timings: Start/end times for each scene
+- word_timestamps: Timing for each word (for advanced sync)""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "script": {
+                    "type": "string",
+                    "description": "Full narration text"
+                },
+                "scenes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "scene_number": {"type": "integer"},
+                            "text": {"type": "string"}
+                        }
+                    },
+                    "description": "List of scenes with their narration text for timing calculation"
+                },
+                "voice_id": {
+                    "type": "string",
+                    "description": "ElevenLabs voice ID (optional)"
+                }
+            },
+            "required": ["script", "scenes"]
+        },
+        "category": "voice"
+    },
+    {
+        "name": "list_available_voices",
+        "description": """Get list of available ElevenLabs voices for narration.
+
+USE THIS WHEN: User asks what voices are available or wants to choose a voice.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {}
+        },
+        "category": "voice"
+    },
+    
+    # -------------------------------------------------------------------------
+    # VIDEO ASSEMBLY TOOLS (Combine clips + audio)
+    # -------------------------------------------------------------------------
+    {
+        "name": "combine_video_with_audio",
+        "description": """Combine video clips with voiceover audio to create the final video.
+
+This is the FINAL STEP after:
+1. Generating images
+2. Generating video transitions (clips)
+3. Generating voiceover audio
+
+WHAT IT DOES:
+- Concatenates all video clips with crossfade transitions
+- Syncs the video to the audio duration (adjusts speed if needed)
+- Adds fade in/out effects
+- Outputs final MP4 with audio
+
+COST: Free (local processing)
+
+INPUTS NEEDED:
+- video_paths: List of transition video clips (from generate_narration_video)
+- audio_path: Path to voiceover MP3 (from generate_voiceover)
+- title: Name for the final video""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "video_paths": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of video clip paths (in order)"
+                },
+                "audio_path": {
+                    "type": "string",
+                    "description": "Path to the voiceover audio file"
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Name for the final video"
+                },
+                "crossfade_duration": {
+                    "type": "number",
+                    "description": "Crossfade duration between clips in seconds (default 0.5)"
+                }
+            },
+            "required": ["video_paths", "audio_path", "title"]
+        },
+        "category": "video"
+    },
+    {
+        "name": "create_full_narration_video",
+        "description": """ONE-SHOT TOOL: Create a complete narration video from images + script.
+
+This combines ALL steps into one:
+1. Generate voiceover from your script (ElevenLabs)
+2. Generate video transitions between images (fal.ai)
+3. Combine video + audio into final MP4
+
+USE THIS WHEN: You have images and script ready and want the complete video.
+
+COST BREAKDOWN:
+- Voiceover: ~$0.30 per 1000 characters
+- Video clips: ~$0.27 per clip × (N-1) clips
+- Example: 6 images, 500 char script = ~$1.50 total
+
+YOUR CREATIVE INPUT:
+- narration_script: The full spoken narration text
+- scene_descriptions: Your cinematic direction for each transition
+
+EXAMPLE:
+For 5 images about Marcus Aurelius:
+- narration_script: "In the silence of dawn, Marcus Aurelius wrote words that would echo through millennia..."
+- scene_descriptions: [
+    "Camera slowly pushes toward the emperor at his writing desk, candlelight flickering...",
+    "Gentle dolly around ancient scrolls, dust motes floating...",
+    "Slow zoom out to reveal the grandeur of the palace...",
+    "Camera pans across the Roman horizon, clouds drifting..."
+  ]""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "image_paths": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of image paths in order"
+                },
+                "narration_script": {
+                    "type": "string",
+                    "description": "Full narration text for voiceover"
+                },
+                "scene_descriptions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Your creative direction for each transition"
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Name for the final video"
+                },
+                "voice_id": {
+                    "type": "string",
+                    "description": "ElevenLabs voice ID (optional)"
+                },
+                "prompt_style": {
+                    "type": "string",
+                    "description": "'documentary' or 'default'",
+                    "default": "documentary"
+                }
+            },
+            "required": ["image_paths", "narration_script", "scene_descriptions", "title"]
+        },
+        "category": "video"
+    },
+
+    # -------------------------------------------------------------------------
     # AUTOMATION TOOLS
     # -------------------------------------------------------------------------
     {
@@ -1087,6 +1300,13 @@ class ToolExecutor:
             "generate_video_transition": self._generate_video_transition,
             "generate_narration_video": self._generate_narration_video,
             "get_video_capabilities": self._get_video_capabilities,
+            # Voice/Narration tools
+            "generate_voiceover": self._generate_voiceover,
+            "generate_voiceover_with_timestamps": self._generate_voiceover_with_timestamps,
+            "list_available_voices": self._list_available_voices,
+            # Video assembly tools
+            "combine_video_with_audio": self._combine_video_with_audio,
+            "create_full_narration_video": self._create_full_narration_video,
             # Automation tools
             "list_automations": self._list_automations,
             "create_automation": self._create_automation,
@@ -2282,6 +2502,229 @@ class ToolExecutor:
                 "Processing takes 30-60 seconds per clip"
             ]
         }
+    
+    # -------------------------------------------------------------------------
+    # VOICE/NARRATION TOOL IMPLEMENTATIONS
+    # -------------------------------------------------------------------------
+    
+    async def _generate_voiceover(
+        self,
+        script: str,
+        voice_id: str = None,
+        filename: str = None
+    ) -> Dict[str, Any]:
+        """Generate voiceover using ElevenLabs."""
+        try:
+            from .voice_generator import VoiceGenerator
+            
+            voice_gen = VoiceGenerator()
+            audio_path = voice_gen.generate_voiceover(
+                script=script,
+                voice_id=voice_id,
+                filename=filename
+            )
+            
+            if audio_path:
+                # Estimate duration (~2.5 words per second)
+                word_count = len(script.split())
+                estimated_duration = word_count / 2.5
+                
+                return {
+                    "success": True,
+                    "audio_path": audio_path,
+                    "estimated_duration_seconds": round(estimated_duration, 1),
+                    "word_count": word_count,
+                    "character_count": len(script),
+                    "message": f"Generated {round(estimated_duration)}s voiceover ({word_count} words)"
+                }
+            else:
+                return {"success": False, "error": "Failed to generate voiceover"}
+                
+        except Exception as e:
+            return {"success": False, "error": f"Voice generation error: {str(e)}"}
+    
+    async def _generate_voiceover_with_timestamps(
+        self,
+        script: str,
+        scenes: List[Dict],
+        voice_id: str = None
+    ) -> Dict[str, Any]:
+        """Generate voiceover with word-level timestamps for sync."""
+        try:
+            from .voice_generator import VoiceGenerator
+            
+            voice_gen = VoiceGenerator()
+            result = voice_gen.generate_voiceover_with_timestamps(
+                script=script,
+                scenes=scenes,
+                voice_id=voice_id
+            )
+            
+            if result:
+                return {
+                    "success": True,
+                    "audio_path": result.get("audio_path"),
+                    "total_duration": result.get("total_duration"),
+                    "scene_timings": result.get("scene_timings"),
+                    "word_count": len(result.get("word_timestamps", [])),
+                    "message": f"Generated {result.get('total_duration', 0):.1f}s voiceover with timestamps"
+                }
+            else:
+                return {"success": False, "error": "Failed to generate voiceover with timestamps"}
+                
+        except Exception as e:
+            return {"success": False, "error": f"Voice generation error: {str(e)}"}
+    
+    async def _list_available_voices(self) -> Dict[str, Any]:
+        """List available ElevenLabs voices."""
+        try:
+            from .voice_generator import VoiceGenerator
+            
+            voice_gen = VoiceGenerator()
+            voices = voice_gen.get_available_voices()
+            
+            return {
+                "success": True,
+                "voices": voices,
+                "recommended": "onwK4e9ZLuTAKqWW03F9",
+                "message": f"Found {len(voices)} available voices"
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    # -------------------------------------------------------------------------
+    # VIDEO ASSEMBLY TOOL IMPLEMENTATIONS
+    # -------------------------------------------------------------------------
+    
+    async def _combine_video_with_audio(
+        self,
+        video_paths: List[str],
+        audio_path: str,
+        title: str,
+        crossfade_duration: float = 0.5
+    ) -> Dict[str, Any]:
+        """Combine video clips with voiceover audio."""
+        try:
+            # Import the video generator which has the combine function
+            import sys
+            sys.path.insert(0, '/home/runner/philosophy_video_generator')
+            from fal_video_generator import FalVideoGenerator
+            
+            generator = FalVideoGenerator()
+            final_path = generator.create_final_video_with_audio(
+                video_paths=video_paths,
+                audio_path=audio_path,
+                story_title=title,
+                crossfade_duration=crossfade_duration
+            )
+            
+            if final_path:
+                # Upload to GCS
+                from .cloud_storage import upload_video_to_gcs
+                gcs_url = upload_video_to_gcs(final_path, delete_local=False)
+                
+                return {
+                    "success": True,
+                    "video_path": final_path,
+                    "video_url": gcs_url or final_path,
+                    "message": f"Created final video: {title}"
+                }
+            else:
+                return {"success": False, "error": "Failed to combine video and audio"}
+                
+        except Exception as e:
+            return {"success": False, "error": f"Video assembly error: {str(e)}"}
+    
+    async def _create_full_narration_video(
+        self,
+        image_paths: List[str],
+        narration_script: str,
+        scene_descriptions: List[str],
+        title: str,
+        voice_id: str = None,
+        prompt_style: str = "documentary"
+    ) -> Dict[str, Any]:
+        """Create a complete narration video from images + script in one call."""
+        try:
+            results = {
+                "steps_completed": [],
+                "steps_failed": []
+            }
+            
+            # Step 1: Generate voiceover
+            voice_result = await self._generate_voiceover(
+                script=narration_script,
+                voice_id=voice_id,
+                filename=f"{title}_narration.mp3"
+            )
+            
+            if not voice_result.get("success"):
+                return {
+                    "success": False,
+                    "error": f"Voice generation failed: {voice_result.get('error')}",
+                    "step": "voiceover"
+                }
+            
+            results["steps_completed"].append("voiceover")
+            results["audio_path"] = voice_result.get("audio_path")
+            results["audio_duration"] = voice_result.get("estimated_duration_seconds")
+            
+            # Step 2: Generate video transitions
+            video_result = await self._generate_narration_video(
+                image_paths=image_paths,
+                scene_descriptions=scene_descriptions,
+                title=title,
+                duration_per_scene="6",
+                prompt_style=prompt_style
+            )
+            
+            if not video_result.get("success"):
+                return {
+                    "success": False,
+                    "error": f"Video generation failed: {video_result.get('error')}",
+                    "step": "video_transitions",
+                    "voiceover_completed": True,
+                    "audio_path": results["audio_path"]
+                }
+            
+            results["steps_completed"].append("video_transitions")
+            results["video_clips"] = video_result.get("video_paths", [])
+            results["clips_generated"] = video_result.get("total_clips_generated")
+            
+            # Step 3: Combine video + audio
+            combine_result = await self._combine_video_with_audio(
+                video_paths=video_result.get("video_paths", []),
+                audio_path=voice_result.get("audio_path"),
+                title=title
+            )
+            
+            if not combine_result.get("success"):
+                return {
+                    "success": False,
+                    "error": f"Video assembly failed: {combine_result.get('error')}",
+                    "step": "assembly",
+                    "voiceover_completed": True,
+                    "video_clips_completed": True,
+                    "audio_path": results["audio_path"],
+                    "video_clips": results["video_clips"]
+                }
+            
+            results["steps_completed"].append("assembly")
+            
+            return {
+                "success": True,
+                "final_video_path": combine_result.get("video_path"),
+                "final_video_url": combine_result.get("video_url"),
+                "audio_path": results["audio_path"],
+                "audio_duration_seconds": results["audio_duration"],
+                "video_clips": results["video_clips"],
+                "clips_generated": results["clips_generated"],
+                "steps_completed": results["steps_completed"],
+                "message": f"Created complete narration video: {title}"
+            }
+            
+        except Exception as e:
+            return {"success": False, "error": f"Full pipeline error: {str(e)}"}
     
     # -------------------------------------------------------------------------
     # AUTOMATION TOOL IMPLEMENTATIONS
