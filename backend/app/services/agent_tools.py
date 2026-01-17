@@ -538,34 +538,28 @@ RETURNS: Post status and URL if published.""",
     # -------------------------------------------------------------------------
     {
         "name": "generate_video_transition",
-        "description": """Generate a cinematic video transition between two images using AI.
+        "description": """Generate a single cinematic video transition between two images.
 
-MODEL: MiniMax Hailuo-02 (fal-ai/minimax/hailuo-02/standard/image-to-video)
-COST: ~$0.27 per 6-second clip ($0.045/second)
+YOU write the creative direction. The AI brings it to life.
 
-CAPABILITIES:
-- Takes a START frame and END frame, generates smooth motion between them
-- Prompt-guided: describe HOW the transition should look/feel
-- Duration: 5 or 6 seconds per clip
-- Resolution: 768P (faster) or 1080P (higher quality)
+MODEL: MiniMax Hailuo-02 | COST: ~$0.27 per 6-second clip
 
-USE THIS WHEN:
-- User wants to bring slides/images to life with motion
-- Creating cinematic transitions between scenes
-- Building a narration video with flowing visuals
+YOUR PROMPT should be 2-4 sentences describing:
+- Camera movement: "slow push in", "gentle dolly around", "subtle zoom out"
+- Atmosphere: "dust particles in amber light", "shadows deepening", "smoke wisps"
+- Emotional tone: "contemplative weight", "rising tension", "peaceful clarity"
+- Lighting: "candlelit warmth", "dramatic chiaroscuro", "golden hour glow"
 
-PROMPT TIPS:
-- Describe camera movement: "slow dolly in", "gentle pan left", "subtle zoom"
-- Describe mood: "dramatic lighting", "ethereal glow", "flickering candlelight"
-- Describe effects: "dust particles floating", "smoke wisps", "light rays"
-- Keep subject relatively still, let camera/atmosphere do the motion
+EXAMPLE PROMPTS YOU MIGHT WRITE:
 
-EXAMPLE PROMPTS:
-- "Ancient philosopher in candlelit study, camera slowly dollies in as dust particles float through golden light beams"
-- "Stoic emperor gazing at horizon, subtle camera movement, dramatic clouds drifting slowly"
-- "Wise sage meditating, gentle breathing motion, incense smoke curling upward"
+"Camera slowly pushes toward the philosopher's weathered hands resting on ancient scrolls. Dust particles drift through amber candlelight. Shadows lengthen across the stone floor as contemplative weight fills the frame."
 
-NOTE: This generates a SINGLE clip between 2 images. For a full video with multiple scenes, use generate_narration_video.""",
+"Gentle dolly movement around the stoic emperor's silhouette. Dramatic clouds drift slowly behind. The atmosphere thickens with the weight of empire and mortality."
+
+"Slow zoom out reveals the vastness of the ancient library. Light rays pierce through high windows, illuminating floating dust motes. A sense of timeless wisdom pervades."
+
+USE FOR: Testing a single transition, or when you want fine control over individual clips.
+For full videos, use generate_narration_video with scene_descriptions array.""",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -579,7 +573,7 @@ NOTE: This generates a SINGLE clip between 2 images. For a full video with multi
                 },
                 "prompt": {
                     "type": "string",
-                    "description": "Description of the motion, camera movement, and atmosphere for the transition"
+                    "description": "YOUR creative direction - 2-4 sentences describing camera movement, atmosphere, emotion, lighting"
                 },
                 "duration": {
                     "type": "string",
@@ -593,34 +587,46 @@ NOTE: This generates a SINGLE clip between 2 images. For a full video with multi
     },
     {
         "name": "generate_narration_video",
-        "description": """Generate a full narration video with cinematic transitions between ALL images.
+        "description": """Generate a cinematic narration video by bringing YOUR creative vision to life.
 
-MODEL: MiniMax Hailuo-02 (fal-ai/minimax/hailuo-02/standard/image-to-video)
-COST: ~$0.27 per clip × (N-1) clips for N images
-      Example: 6 images = 5 clips = ~$1.35
+YOU ARE THE CREATIVE DIRECTOR. You write the scene descriptions, design the transitions, craft the visual journey.
+The AI model animates your vision.
 
-This creates a flowing cinematic video where each scene transitions smoothly into the next.
-Perfect for philosophical narration content.
+MODEL: MiniMax Hailuo-02 | COST: ~$0.27 per clip × (N-1) clips
 
-USE THIS WHEN:
-- User has a project with generated slides and wants a cinematic video
-- Creating documentary-style philosophical content
-- Turning a static slideshow into an immersive visual experience
+YOUR CREATIVE PROCESS:
+1. Study the slideshow images - what story do they tell together?
+2. Write a scene_description for EACH transition (image[i] → image[i+1])
+3. Each description should be 2-4 sentences of evocative, cinematic direction
+4. Call this tool with your crafted descriptions
+
+WRITING GREAT SCENE DESCRIPTIONS:
+
+Each description guides 6 seconds of motion. Include:
+- Camera movement: "slow push in", "gentle dolly around", "subtle zoom out"
+- Atmosphere: "dust motes in candlelight", "shadows lengthening", "smoke wisps rising"  
+- Emotional tone: "contemplative stillness", "building tension", "peaceful revelation"
+- Lighting: "golden hour glow", "flickering torchlight", "dramatic chiaroscuro"
+
+EXAMPLE SCENE DESCRIPTIONS (for a 5-image slideshow = 4 transitions):
+
+scene_descriptions: [
+    "Camera slowly pushes toward the philosopher's silhouette. Dust particles drift through amber candlelight. Shadows deepen as anticipation builds.",
+    
+    "Gentle dolly around weathered stone columns. Torchlight flickers, casting dancing shadows. The atmosphere grows heavy with contemplation.",
+    
+    "Slow zoom out reveals the grandeur of the ancient hall. Light rays pierce through high windows. Tension releases into clarity.",
+    
+    "Camera pans across ancient scrolls and texts. Warm candlelight breathes with subtle motion. An invitation to reflect."
+]
 
 PROMPT STYLES:
-- "documentary": Dramatic, candlelit atmosphere with TV static glitch effects (epic/artistic)
-- "default": Clean, subtle camera movements (professional/minimal)
+- "documentary": Adds TV static glitch effects, dramatic atmosphere (recommended for philosophy)
+- "default": Clean, subtle movements
 
-HOW IT WORKS:
-1. For N images, generates N-1 transition clips
-2. Each clip starts on image[i] and ends on image[i+1]
-3. Clips can be concatenated for seamless playback
-4. Each clip is 5-6 seconds long
+OUTPUT: N-1 video clips that flow seamlessly when viewed in sequence.
 
-EXAMPLE:
-6 slideshow images → 5 transition clips → ~30 seconds of cinematic video
-
-NOTE: This is computationally expensive. For testing, try generate_video_transition with just 2 images first.""",
+ALWAYS write your own scene descriptions. Generic descriptions produce generic videos.""",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -632,7 +638,7 @@ NOTE: This is computationally expensive. For testing, try generate_video_transit
                 "scene_descriptions": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Optional descriptions for each transition (what motion/mood for each scene change)"
+                    "description": "YOUR creative descriptions for each transition - be specific, evocative, cinematic. One description per transition (N-1 for N images)."
                 },
                 "title": {
                     "type": "string",
@@ -650,7 +656,7 @@ NOTE: This is computationally expensive. For testing, try generate_video_transit
                     "default": "documentary"
                 }
             },
-            "required": ["image_paths"]
+            "required": ["image_paths", "scene_descriptions"]
         },
         "category": "video"
     },
