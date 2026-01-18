@@ -195,7 +195,13 @@ class AutomationScheduler:
                 db.close()
     
     def run_automation(self, automation_id: str):
-        """Execute an automation - generate slideshow and optionally post to TikTok."""
+        """Execute an automation - generate slideshow and optionally post to TikTok.
+        
+        Supports two modes:
+        1. Project Queue Mode: If project_ids is set, uses pre-created projects
+           and only generates images (script already exists).
+        2. Topic Queue Mode: Original behavior - generates script then images.
+        """
         logger.info(f"Running automation {automation_id}")
         
         db = SessionLocal()
@@ -210,72 +216,17 @@ class AutomationScheduler:
                 logger.info(f"Automation {automation.name} is not running, skipping")
                 return
             
-            # Get the next topic
-            topic = automation.get_next_topic()
             settings = automation.settings or {}
             
-            # Create run record
-            run = AutomationRun(
-                automation_id=automation_id,
-                topic=topic,
-                status="running",
-                settings_used={
-                    "content_type": automation.content_type,
-                    "image_style": automation.image_style,
-                    "font": settings.get("font", "social"),
-                    "image_model": settings.get("image_model", "gpt15"),
-                }
-            )
-            db.add(run)
-            db.commit()
-            db.refresh(run)
+            # Check if we're in project queue mode or topic queue mode
+            if automation.has_projects_in_queue():
+                # PROJECT QUEUE MODE: Use pre-created project
+                self._run_with_project(automation, db, settings)
+            else:
+                # TOPIC QUEUE MODE: Original behavior
+                self._run_with_topic(automation, db, settings)
             
-            logger.info(f"Starting run {run.id[:8]} for topic: {topic}")
-            
-            try:
-                # Import and run the slideshow pipeline
-                from slideshow_automation import generate_slideshow
-                
-                result = generate_slideshow(
-                    topic=topic,
-                    model=settings.get("image_model", "gpt15"),
-                    font_name=settings.get("font", "social"),
-                    theme=automation.image_style or "auto",
-                    auto_id=automation.name[:20]
-                )
-                
-                if result.get("success"):
-                    run.mark_completed(
-                        slides_count=result.get("slides_count", 0),
-                        image_paths=result.get("image_paths", [])
-                    )
-                    run.script_path = result.get("script_path")
-                    
-                    logger.info(f"Run {run.id[:8]} completed: {result.get('slides_count')} slides")
-                    
-                    # Post to TikTok if enabled
-                    if settings.get("post_to_tiktok", False):
-                        self._post_to_tiktok(run, result, db)
-                    
-                    # Post to Instagram if enabled
-                    if settings.get("post_to_instagram", False):
-                        self._post_to_instagram(run, result, db)
-                    
-                    # Update automation stats
-                    automation.successful_runs += 1
-                    automation.advance_topic()
-                    
-                else:
-                    run.mark_failed(result.get("error", "Unknown error"))
-                    automation.failed_runs += 1
-                    logger.error(f"Run {run.id[:8]} failed: {result.get('error')}")
-                
-            except Exception as e:
-                run.mark_failed(str(e), {"traceback": str(e)})
-                automation.failed_runs += 1
-                logger.exception(f"Run {run.id[:8]} exception: {e}")
-            
-            # Update automation
+            # Update automation timing
             automation.total_runs += 1
             automation.last_run = datetime.utcnow()
             db.commit()
@@ -287,6 +238,179 @@ class AutomationScheduler:
             logger.exception(f"Error running automation {automation_id}: {e}")
         finally:
             db.close()
+
+    def _run_with_project(self, automation: Automation, db: Session, settings: dict):
+        """Run automation using a pre-created project (images only)."""
+        from ..models import Project, Slide
+        
+        project_id = automation.get_next_project_id()
+        if not project_id:
+            logger.warning(f"No more projects in queue for {automation.name}")
+            return
+        
+        # Get the project
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            logger.error(f"Project {project_id} not found")
+            automation.advance_project()  # Skip this one
+            return
+        
+        # Create run record
+        run = AutomationRun(
+            automation_id=automation.id,
+            topic=project.title or project.topic or "Pre-created project",
+            project_id=project_id,
+            status="running",
+            settings_used={
+                "mode": "project_queue",
+                "project_id": project_id,
+                "font": settings.get("font", "social"),
+                "image_model": settings.get("image_model", "gpt15"),
+            }
+        )
+        db.add(run)
+        db.commit()
+        db.refresh(run)
+        
+        logger.info(f"Starting run {run.id[:8]} for project: {project_id[:8]}")
+        
+        try:
+            # Get slides that need image generation
+            slides = db.query(Slide).filter(
+                Slide.project_id == project_id
+            ).order_by(Slide.slide_number).all()
+            
+            if not slides:
+                run.mark_failed("No slides in project")
+                automation.failed_runs += 1
+                automation.advance_project()
+                return
+            
+            # Generate images for slides that don't have them
+            from ..services.image_generation import ImageGenerationService
+            
+            image_service = ImageGenerationService()
+            image_paths = []
+            slides_generated = 0
+            
+            for slide in slides:
+                # Skip if already has a final image
+                if slide.final_image_path:
+                    image_paths.append(slide.final_image_path)
+                    continue
+                
+                # Generate image for this slide
+                try:
+                    result = image_service.generate_slide_image(
+                        slide_id=slide.id,
+                        model=settings.get("image_model", "gpt15"),
+                        font=settings.get("font", "social"),
+                        theme=automation.image_style or "golden_dust",
+                        db=db
+                    )
+                    
+                    if result.get("success"):
+                        image_paths.append(result.get("final_image_path", ""))
+                        slides_generated += 1
+                    else:
+                        logger.warning(f"Failed to generate image for slide {slide.id}: {result.get('error')}")
+                        
+                except Exception as e:
+                    logger.exception(f"Error generating image for slide {slide.id}: {e}")
+            
+            # Mark as completed
+            run.mark_completed(
+                slides_count=len(slides),
+                image_paths=image_paths
+            )
+            
+            logger.info(f"Run {run.id[:8]} completed: {len(slides)} slides, {slides_generated} generated")
+            
+            # Post to social media if enabled
+            result = {"image_paths": image_paths, "title": project.title}
+            
+            if settings.get("post_to_tiktok", False):
+                self._post_to_tiktok(run, result, db)
+            
+            if settings.get("post_to_instagram", False):
+                self._post_to_instagram(run, result, db)
+            
+            # Update automation stats
+            automation.successful_runs += 1
+            automation.advance_project()
+            
+        except Exception as e:
+            run.mark_failed(str(e), {"traceback": str(e)})
+            automation.failed_runs += 1
+            automation.advance_project()  # Move on even if failed
+            logger.exception(f"Run {run.id[:8]} exception: {e}")
+
+    def _run_with_topic(self, automation: Automation, db: Session, settings: dict):
+        """Run automation using topic queue (original behavior - generate script and images)."""
+        # Get the next topic
+        topic = automation.get_next_topic()
+        
+        # Create run record
+        run = AutomationRun(
+            automation_id=automation.id,
+            topic=topic,
+            status="running",
+            settings_used={
+                "mode": "topic_queue",
+                "content_type": automation.content_type,
+                "image_style": automation.image_style,
+                "font": settings.get("font", "social"),
+                "image_model": settings.get("image_model", "gpt15"),
+            }
+        )
+        db.add(run)
+        db.commit()
+        db.refresh(run)
+        
+        logger.info(f"Starting run {run.id[:8]} for topic: {topic}")
+        
+        try:
+            # Import and run the slideshow pipeline
+            from slideshow_automation import generate_slideshow
+            
+            result = generate_slideshow(
+                topic=topic,
+                model=settings.get("image_model", "gpt15"),
+                font_name=settings.get("font", "social"),
+                theme=automation.image_style or "auto",
+                auto_id=automation.name[:20]
+            )
+            
+            if result.get("success"):
+                run.mark_completed(
+                    slides_count=result.get("slides_count", 0),
+                    image_paths=result.get("image_paths", [])
+                )
+                run.script_path = result.get("script_path")
+                
+                logger.info(f"Run {run.id[:8]} completed: {result.get('slides_count')} slides")
+                
+                # Post to TikTok if enabled
+                if settings.get("post_to_tiktok", False):
+                    self._post_to_tiktok(run, result, db)
+                
+                # Post to Instagram if enabled
+                if settings.get("post_to_instagram", False):
+                    self._post_to_instagram(run, result, db)
+                
+                # Update automation stats
+                automation.successful_runs += 1
+                automation.advance_topic()
+                
+            else:
+                run.mark_failed(result.get("error", "Unknown error"))
+                automation.failed_runs += 1
+                logger.error(f"Run {run.id[:8]} failed: {result.get('error')}")
+            
+        except Exception as e:
+            run.mark_failed(str(e), {"traceback": str(e)})
+            automation.failed_runs += 1
+            logger.exception(f"Run {run.id[:8]} exception: {e}")
     
     def _post_to_tiktok(self, run: AutomationRun, result: dict, db: Session):
         """Post the generated slideshow to TikTok."""

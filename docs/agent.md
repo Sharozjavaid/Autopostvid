@@ -195,6 +195,101 @@ cleanupRef.current = streamAgentMessage(
 3. Add filter button in Gallery tab
 4. Update `filteredGalleryItems` logic to handle new type
 
+## Agent-Prepared Automation (Project Queue Mode)
+
+The agent can create content projects upfront and queue them for automated execution. This gives the agent control over what content gets posted while the automation handles scheduling.
+
+### How It Works
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│             Interactive Phase (You + Agent)                   │
+│                                                               │
+│  1. Brainstorm topics with the agent                         │
+│  2. Agent creates projects with generate_script              │
+│  3. Review and approve scripts                               │
+│  4. Agent queues projects: queue_projects_for_automation     │
+└──────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│                 Scheduled Execution                           │
+│                                                               │
+│  • APScheduler fires at configured times                     │
+│  • Gets next project from queue                              │
+│  • Generates images for the project                          │
+│  • Posts to TikTok/Instagram if enabled                      │
+│  • Records run in AutomationRun table                        │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Two Queue Modes
+
+| Mode | Description | Behavior |
+|------|-------------|----------|
+| **Topics Queue** | List of topic strings | Generates script + images on each run |
+| **Projects Queue** | List of project UUIDs | Only generates images (script already exists) |
+
+When `project_ids` is populated, the automation uses Project Queue mode. Otherwise, it falls back to Topics Queue mode.
+
+### Agent Tools for Project Queue
+
+| Tool | Description |
+|------|-------------|
+| `queue_projects_for_automation` | Add pre-created projects to an automation's queue |
+| `get_automation_queue_status` | View queue status, items, and progress |
+| `skip_to_next_in_queue` | Skip current item without running |
+
+### Example Agent Conversation
+
+```
+User: "Let's prepare content for next week"
+
+Agent: I'll create 5 projects for your Daily Wisdom automation.
+       [calls generate_script for each topic]
+       [calls approve_script for each]
+       [calls queue_projects_for_automation with all 5 project IDs]
+       
+       Done! 5 projects queued for your 9am automation:
+       1. Marcus Aurelius and journaling
+       2. Seneca's letters to Lucilius  
+       3. Epictetus: From slave to sage
+       4. The Stoic morning routine
+       5. 5 philosophers who changed history
+       
+       The automation will generate images and post when scheduled.
+```
+
+### UI Queue Visualization
+
+The Automations page shows:
+- **Queue Mode Badge**: Purple "Project Queue Mode" badge when using projects
+- **Queue Stats**: Shows total items, current position, remaining
+- **Queue Modal**: View all items with status (completed/current/pending)
+- **Skip Button**: Advance to next item without running
+
+### API Endpoints
+
+```bash
+GET  /api/automations/{id}/queue           # Get queue status
+POST /api/automations/{id}/queue/projects  # Add projects to queue
+POST /api/automations/{id}/queue/skip      # Skip current item
+DELETE /api/automations/{id}/queue/projects # Clear project queue
+POST /api/automations/{id}/runs/{run_id}/post-now # Post completed run
+```
+
+### Post Now Feature
+
+Completed runs can be posted immediately to social platforms:
+
+```bash
+POST /api/automations/{id}/runs/{run_id}/post-now?platform=tiktok
+POST /api/automations/{id}/runs/{run_id}/post-now?platform=instagram
+POST /api/automations/{id}/runs/{run_id}/post-now?platform=both
+```
+
+The Runs History modal shows Post Now buttons for unposted completed runs.
+
 ## Key Files for Agent/Gallery
 - `/frontend/src/pages/Agent.tsx` - Main agent page with tabs
 - `/frontend/src/context/GalleryContext.tsx` - Gallery state with API sync
@@ -204,3 +299,10 @@ cleanupRef.current = streamAgentMessage(
 - `/backend/app/routers/agent.py` - Agent chat endpoints
 - `backend/app/services/agent_tools.py` - Agent tool definitions
 - `backend/app/services/agent_service.py` - Main agent service
+
+## Key Files for Automation System
+- `/backend/app/models/automation.py` - Automation model with project_ids queue
+- `/backend/app/models/automation_run.py` - Run history model
+- `/backend/app/services/scheduler.py` - APScheduler service (handles both modes)
+- `/backend/app/routers/automations.py` - API endpoints including queue management
+- `/frontend/src/pages/Automations.tsx` - UI with queue visualization

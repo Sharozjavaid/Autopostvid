@@ -1090,6 +1090,82 @@ RETURNS: Current TikTok and Instagram posting status.""",
         },
         "category": "automations"
     },
+    {
+        "name": "queue_projects_for_automation",
+        "description": """Add pre-created projects to an automation's execution queue.
+
+USE THIS WHEN: You've brainstormed with the user and created multiple projects with scripts.
+Now you can queue them for automated image generation and posting.
+
+HOW IT WORKS:
+1. Create projects with generate_script first (don't generate images yet)
+2. Call this tool with those project IDs to queue them
+3. When automation runs, it generates images for queued projects and posts
+
+BENEFITS:
+- Agent controls exactly what content gets posted
+- Scripts are pre-reviewed before images are generated
+- Automation just executes the prepared content
+
+NOTE: Projects should be in 'script_approved' status for best results.
+      Replaces any existing project queue (use append mode to add to existing).""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "automation_id": {
+                    "type": "string",
+                    "description": "The automation ID to add projects to"
+                },
+                "project_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Array of project IDs to queue for execution"
+                },
+                "append": {
+                    "type": "boolean",
+                    "description": "If true, add to existing queue. If false, replace queue.",
+                    "default": False
+                }
+            },
+            "required": ["automation_id", "project_ids"]
+        },
+        "category": "automations"
+    },
+    {
+        "name": "get_automation_queue_status",
+        "description": """Get detailed status of an automation's project/topic queue.
+
+USE THIS WHEN: User wants to see what's queued for an automation.
+RETURNS: Queue mode (projects vs topics), total items, current position, remaining items.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "automation_id": {
+                    "type": "string",
+                    "description": "The automation ID"
+                }
+            },
+            "required": ["automation_id"]
+        },
+        "category": "automations"
+    },
+    {
+        "name": "skip_to_next_in_queue",
+        "description": """Skip the current item in the automation queue and move to next.
+
+USE THIS WHEN: User wants to skip a queued project/topic without running it.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "automation_id": {
+                    "type": "string",
+                    "description": "The automation ID"
+                }
+            },
+            "required": ["automation_id"]
+        },
+        "category": "automations"
+    },
 
     # -------------------------------------------------------------------------
     # SETTINGS & INFO TOOLS
@@ -1317,6 +1393,9 @@ class ToolExecutor:
             "get_automation_runs": self._get_automation_runs,
             "update_automation_social_settings": self._update_automation_social_settings,
             "get_automation_social_settings": self._get_automation_social_settings,
+            "queue_projects_for_automation": self._queue_projects_for_automation,
+            "get_automation_queue_status": self._get_automation_queue_status,
+            "skip_to_next_in_queue": self._skip_to_next_in_queue,
             # Settings tools
             "list_fonts": self._list_fonts,
             "list_content_types": self._list_content_types,
@@ -2859,8 +2938,15 @@ class ToolExecutor:
             if not automation:
                 return {"success": False, "error": "Automation not found"}
             
-            if not automation.topics:
-                return {"success": False, "error": "No topics in queue"}
+            # Check if there's anything to run
+            if automation.has_projects_in_queue():
+                next_item = f"project {automation.get_next_project_id()[:8]}..."
+                mode = "project_queue"
+            elif automation.topics:
+                next_item = automation.get_next_topic()
+                mode = "topic_queue"
+            else:
+                return {"success": False, "error": "No topics or projects in queue"}
             
             scheduler = get_scheduler()
             scheduler.run_now(automation_id)
@@ -2868,7 +2954,8 @@ class ToolExecutor:
             return {
                 "success": True,
                 "automation_id": automation_id,
-                "topic": automation.get_next_topic(),
+                "mode": mode,
+                "next_item": next_item,
                 "message": "Automation triggered. Check runs for status."
             }
         finally:
@@ -2981,6 +3068,159 @@ class ToolExecutor:
                 "post_to_instagram": settings.get("post_to_instagram", False),
                 "post_to_drafts": settings.get("post_to_drafts", True)
             }
+        finally:
+            db.close()
+    
+    async def _queue_projects_for_automation(
+        self,
+        automation_id: str,
+        project_ids: List[str],
+        append: bool = False
+    ) -> Dict[str, Any]:
+        """Add pre-created projects to an automation's execution queue."""
+        db = self.get_db()
+        try:
+            automation = db.query(Automation).filter(Automation.id == automation_id).first()
+            if not automation:
+                return {"success": False, "error": "Automation not found"}
+            
+            # Validate that all projects exist
+            valid_project_ids = []
+            invalid_ids = []
+            
+            for pid in project_ids:
+                project = db.query(Project).filter(Project.id == pid).first()
+                if project:
+                    valid_project_ids.append(pid)
+                else:
+                    invalid_ids.append(pid)
+            
+            if invalid_ids:
+                return {
+                    "success": False,
+                    "error": f"Projects not found: {invalid_ids}"
+                }
+            
+            # Update the queue
+            if append:
+                current_queue = automation.project_ids or []
+                automation.project_ids = current_queue + valid_project_ids
+            else:
+                automation.project_ids = valid_project_ids
+                automation.current_project_index = 0  # Reset index when replacing
+            
+            db.commit()
+            
+            return {
+                "success": True,
+                "automation_id": automation_id,
+                "automation_name": automation.name,
+                "project_ids": automation.project_ids,
+                "total_queued": len(automation.project_ids),
+                "current_index": automation.current_project_index,
+                "remaining": len(automation.project_ids) - automation.current_project_index,
+                "message": f"Queued {len(valid_project_ids)} projects for '{automation.name}'"
+            }
+        finally:
+            db.close()
+    
+    async def _get_automation_queue_status(
+        self,
+        automation_id: str
+    ) -> Dict[str, Any]:
+        """Get detailed status of an automation's project/topic queue."""
+        db = self.get_db()
+        try:
+            automation = db.query(Automation).filter(Automation.id == automation_id).first()
+            if not automation:
+                return {"success": False, "error": "Automation not found"}
+            
+            queue_status = automation.get_queue_status()
+            
+            # Get details about queued items
+            items = []
+            if automation.project_ids:
+                for i, pid in enumerate(automation.project_ids):
+                    project = db.query(Project).filter(Project.id == pid).first()
+                    items.append({
+                        "index": i,
+                        "type": "project",
+                        "id": pid,
+                        "title": project.title if project else "Unknown",
+                        "status": "completed" if i < automation.current_project_index else (
+                            "current" if i == automation.current_project_index else "pending"
+                        )
+                    })
+            elif automation.topics:
+                for i, topic in enumerate(automation.topics):
+                    items.append({
+                        "index": i,
+                        "type": "topic",
+                        "title": topic,
+                        "status": "completed" if i < automation.current_topic_index else (
+                            "current" if i == automation.current_topic_index else "pending"
+                        )
+                    })
+            
+            return {
+                "success": True,
+                "automation_id": automation_id,
+                "automation_name": automation.name,
+                "queue_mode": queue_status["mode"],
+                "total_items": queue_status["total_items"],
+                "current_index": queue_status["current_index"],
+                "remaining": queue_status["remaining"],
+                "is_exhausted": queue_status["is_exhausted"],
+                "items": items
+            }
+        finally:
+            db.close()
+    
+    async def _skip_to_next_in_queue(
+        self,
+        automation_id: str
+    ) -> Dict[str, Any]:
+        """Skip the current item in the automation queue and move to next."""
+        db = self.get_db()
+        try:
+            automation = db.query(Automation).filter(Automation.id == automation_id).first()
+            if not automation:
+                return {"success": False, "error": "Automation not found"}
+            
+            if automation.project_ids:
+                skipped_index = automation.current_project_index
+                if skipped_index >= len(automation.project_ids):
+                    return {"success": False, "error": "Queue already exhausted"}
+                
+                skipped_id = automation.project_ids[skipped_index]
+                automation.advance_project()
+                db.commit()
+                
+                return {
+                    "success": True,
+                    "automation_id": automation_id,
+                    "skipped": {"index": skipped_index, "project_id": skipped_id},
+                    "new_index": automation.current_project_index,
+                    "remaining": len(automation.project_ids) - automation.current_project_index
+                }
+            elif automation.topics:
+                skipped_index = automation.current_topic_index
+                if skipped_index >= len(automation.topics):
+                    return {"success": False, "error": "Queue already exhausted (wrapping)"}
+                
+                skipped_topic = automation.topics[skipped_index]
+                automation.advance_topic()
+                db.commit()
+                
+                return {
+                    "success": True,
+                    "automation_id": automation_id,
+                    "skipped": {"index": skipped_index, "topic": skipped_topic},
+                    "new_index": automation.current_topic_index,
+                    "remaining": len(automation.topics)  # Topics wrap around
+                }
+            else:
+                return {"success": False, "error": "No items in queue"}
         finally:
             db.close()
     

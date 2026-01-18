@@ -1,0 +1,16 @@
+{
+  "total_runs": 2,
+  "narrative_runs": 1,
+  "slideshow_runs": 1,
+  "last_run": "2026-01-17T15:54:15.920752",
+  "last_narrative": "The Prince: 5 Rules Machiavelli Taught About Power",
+  "last_slideshow": "5 Philosophers Who Were Actually Dangerous",
+  "used_scripts": {
+    "narrative": [
+      "The Prince: 5 Rules Machiavelli Taught About Power"
+    ],
+    "slideshow": [
+      "5 Philosophers Who Were Actually Dangerous"
+    ]
+  }
+}

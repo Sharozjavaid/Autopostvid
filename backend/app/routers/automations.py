@@ -617,6 +617,174 @@ async def reorder_topics(
 
 
 # =============================================================================
+# PROJECT QUEUE MANAGEMENT
+# =============================================================================
+
+class ProjectQueueAdd(BaseModel):
+    """Add projects to queue request."""
+    project_ids: List[str]
+    append: bool = False  # If true, add to existing queue. If false, replace.
+
+
+@router.get("/{automation_id}/queue")
+async def get_automation_queue(
+    automation_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get detailed queue status for an automation."""
+    automation = db.query(Automation).filter(Automation.id == automation_id).first()
+    if not automation:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    
+    queue_status = automation.get_queue_status()
+    
+    # Get details about queued items
+    items = []
+    if automation.project_ids:
+        for i, pid in enumerate(automation.project_ids):
+            project = db.query(Project).filter(Project.id == pid).first()
+            items.append({
+                "index": i,
+                "type": "project",
+                "id": pid,
+                "title": project.title if project else "Unknown",
+                "topic": project.topic if project else None,
+                "status": "completed" if i < automation.current_project_index else (
+                    "current" if i == automation.current_project_index else "pending"
+                )
+            })
+    elif automation.topics:
+        for i, topic in enumerate(automation.topics):
+            items.append({
+                "index": i,
+                "type": "topic",
+                "title": topic,
+                "status": "completed" if i < automation.current_topic_index else (
+                    "current" if i == automation.current_topic_index else "pending"
+                )
+            })
+    
+    return {
+        "automation_id": automation_id,
+        "automation_name": automation.name,
+        "queue_mode": queue_status["mode"],
+        "total_items": queue_status["total_items"],
+        "current_index": queue_status["current_index"],
+        "remaining": queue_status["remaining"],
+        "is_exhausted": queue_status["is_exhausted"],
+        "items": items
+    }
+
+
+@router.post("/{automation_id}/queue/projects")
+async def add_projects_to_queue(
+    automation_id: str,
+    data: ProjectQueueAdd,
+    db: Session = Depends(get_db)
+):
+    """Add pre-created projects to an automation's execution queue."""
+    automation = db.query(Automation).filter(Automation.id == automation_id).first()
+    if not automation:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    
+    # Validate that all projects exist
+    valid_project_ids = []
+    invalid_ids = []
+    
+    for pid in data.project_ids:
+        project = db.query(Project).filter(Project.id == pid).first()
+        if project:
+            valid_project_ids.append(pid)
+        else:
+            invalid_ids.append(pid)
+    
+    if invalid_ids:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Projects not found: {invalid_ids}"
+        )
+    
+    # Update the queue
+    if data.append:
+        current_queue = automation.project_ids or []
+        automation.project_ids = current_queue + valid_project_ids
+    else:
+        automation.project_ids = valid_project_ids
+        automation.current_project_index = 0  # Reset index when replacing
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "automation_id": automation_id,
+        "project_ids": automation.project_ids,
+        "total_queued": len(automation.project_ids),
+        "current_index": automation.current_project_index,
+        "remaining": len(automation.project_ids) - automation.current_project_index
+    }
+
+
+@router.post("/{automation_id}/queue/skip")
+async def skip_queue_item(
+    automation_id: str,
+    db: Session = Depends(get_db)
+):
+    """Skip the current item in the queue and advance to next."""
+    automation = db.query(Automation).filter(Automation.id == automation_id).first()
+    if not automation:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    
+    if automation.project_ids:
+        if automation.current_project_index >= len(automation.project_ids):
+            raise HTTPException(status_code=400, detail="Queue already exhausted")
+        
+        skipped_id = automation.project_ids[automation.current_project_index]
+        automation.advance_project()
+        db.commit()
+        
+        return {
+            "success": True,
+            "skipped": {"index": automation.current_project_index - 1, "project_id": skipped_id},
+            "new_index": automation.current_project_index,
+            "remaining": len(automation.project_ids) - automation.current_project_index
+        }
+    elif automation.topics:
+        skipped_topic = automation.topics[automation.current_topic_index]
+        automation.advance_topic()
+        db.commit()
+        
+        return {
+            "success": True,
+            "skipped": {"index": automation.current_topic_index - 1 if automation.current_topic_index > 0 else len(automation.topics) - 1, "topic": skipped_topic},
+            "new_index": automation.current_topic_index,
+            "remaining": len(automation.topics)
+        }
+    else:
+        raise HTTPException(status_code=400, detail="No items in queue")
+
+
+@router.delete("/{automation_id}/queue/projects")
+async def clear_project_queue(
+    automation_id: str,
+    db: Session = Depends(get_db)
+):
+    """Clear the project queue and reset to topic mode."""
+    automation = db.query(Automation).filter(Automation.id == automation_id).first()
+    if not automation:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    
+    automation.project_ids = []
+    automation.current_project_index = 0
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "Project queue cleared. Automation will use topics queue.",
+        "queue_mode": "topics"
+    }
+
+
+# =============================================================================
 # RUN HISTORY
 # =============================================================================
 
@@ -662,6 +830,116 @@ async def get_automation_run(
         raise HTTPException(status_code=404, detail="Run not found")
     
     return run.to_dict()
+
+
+@router.post("/{automation_id}/runs/{run_id}/post-now")
+async def post_run_now(
+    automation_id: str,
+    run_id: str,
+    platform: str = Query("tiktok", regex="^(tiktok|instagram|both)$"),
+    db: Session = Depends(get_db)
+):
+    """
+    Immediately post a completed run to TikTok or Instagram.
+    
+    Use this when:
+    - A slideshow was generated but not yet posted
+    - You want to post to a specific platform
+    - You want to post to both platforms at once
+    
+    Args:
+        platform: 'tiktok', 'instagram', or 'both'
+    """
+    from ..models import AutomationRun
+    from ..services.tiktok_poster import TikTokPoster
+    from ..services.instagram_poster import InstagramPoster
+    
+    # Get the run
+    run = db.query(AutomationRun).filter(
+        AutomationRun.id == run_id,
+        AutomationRun.automation_id == automation_id
+    ).first()
+    
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    # Check that the run completed (has images to post)
+    if run.status not in ("completed", "posted"):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Run status is '{run.status}' - can only post completed runs"
+        )
+    
+    if not run.image_paths or len(run.image_paths) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Run has no images to post (need at least 2 for slideshow)"
+        )
+    
+    results = {"tiktok": None, "instagram": None}
+    caption = f"{run.topic} #philosophy #stoicism #wisdom #motivation"
+    
+    # Post to TikTok
+    if platform in ("tiktok", "both"):
+        try:
+            poster = TikTokPoster()
+            result = poster.post_photo_slideshow(
+                image_paths=run.image_paths,
+                caption=caption
+            )
+            
+            if result.get("success"):
+                run.tiktok_posted = True
+                run.tiktok_publish_id = result.get("publish_id")
+                run.tiktok_post_status = "pending"
+                run.tiktok_error = None
+                results["tiktok"] = {"success": True, "publish_id": result.get("publish_id")}
+            else:
+                run.tiktok_post_status = "failed"
+                run.tiktok_error = result.get("error", "Unknown error")
+                results["tiktok"] = {"success": False, "error": run.tiktok_error}
+        except Exception as e:
+            run.tiktok_post_status = "failed"
+            run.tiktok_error = str(e)
+            results["tiktok"] = {"success": False, "error": str(e)}
+    
+    # Post to Instagram
+    if platform in ("instagram", "both"):
+        try:
+            poster = InstagramPoster()
+            ig_caption = f"{run.topic}\n\n#philosophy #stoicism #wisdom #motivation #ancientwisdom"
+            result = poster.post_carousel(
+                image_paths=run.image_paths,
+                caption=ig_caption
+            )
+            
+            if result.get("success"):
+                run.instagram_posted = True
+                run.instagram_post_id = result.get("post_id")
+                run.instagram_post_status = "posted"
+                run.instagram_error = None
+                results["instagram"] = {"success": True, "post_id": result.get("post_id")}
+            else:
+                run.instagram_post_status = "failed"
+                run.instagram_error = result.get("error", "Unknown error")
+                results["instagram"] = {"success": False, "error": run.instagram_error}
+        except Exception as e:
+            run.instagram_post_status = "failed"
+            run.instagram_error = str(e)
+            results["instagram"] = {"success": False, "error": str(e)}
+    
+    # Update status if any post succeeded
+    if (results.get("tiktok", {}).get("success") or 
+        results.get("instagram", {}).get("success")):
+        run.status = "posted"
+    
+    db.commit()
+    
+    return {
+        "success": any(r and r.get("success") for r in results.values()),
+        "run_id": run_id,
+        "results": results
+    }
 
 
 @router.post("/{automation_id}/runs/{run_id}/retry-tiktok")

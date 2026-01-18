@@ -35,6 +35,14 @@ class Automation(Base):
     current_topic_index = Column(Integer, default=0)
     # Tracks which topic to use next
 
+    # Pre-created Projects Queue (alternative to topics)
+    # When set, automation uses these pre-created projects instead of generating new ones
+    project_ids = Column(JSON, default=list)
+    # Example: ["uuid1", "uuid2", ...]
+    
+    current_project_index = Column(Integer, default=0)
+    # Tracks which project to process next
+
     # Schedule Configuration
     schedule_times = Column(JSON, default=list)
     # Array of times in 24hr format: ["09:00", "14:00", "21:00"]
@@ -93,6 +101,36 @@ class Automation(Base):
         if self.topics:
             self.current_topic_index = (self.current_topic_index + 1) % len(self.topics)
 
+    def get_next_project_id(self) -> str | None:
+        """Get the next project ID from the queue."""
+        if not self.project_ids:
+            return None
+        
+        if self.current_project_index >= len(self.project_ids):
+            return None  # Queue exhausted
+        
+        return self.project_ids[self.current_project_index]
+
+    def advance_project(self):
+        """Move to the next project in the queue."""
+        if self.project_ids:
+            self.current_project_index = self.current_project_index + 1
+            # Note: We don't wrap around - once queue is done, it's done
+
+    def has_projects_in_queue(self) -> bool:
+        """Check if there are pre-created projects to process."""
+        return bool(self.project_ids) and self.current_project_index < len(self.project_ids)
+
+    def get_queue_status(self) -> dict:
+        """Get detailed queue status for UI display."""
+        return {
+            "mode": "projects" if self.project_ids else "topics",
+            "total_items": len(self.project_ids) if self.project_ids else len(self.topics or []),
+            "current_index": self.current_project_index if self.project_ids else self.current_topic_index,
+            "remaining": (len(self.project_ids) - self.current_project_index) if self.project_ids else len(self.topics or []),
+            "is_exhausted": self.project_ids and self.current_project_index >= len(self.project_ids),
+        }
+
     def to_dict(self):
         """Convert to dictionary for API responses."""
         return {
@@ -102,6 +140,8 @@ class Automation(Base):
             "image_style": self.image_style,
             "topics": self.topics or [],
             "current_topic_index": self.current_topic_index,
+            "project_ids": self.project_ids or [],
+            "current_project_index": self.current_project_index,
             "schedule_times": self.schedule_times or [],
             "schedule_days": self.schedule_days or [],
             "email_enabled": self.email_enabled,

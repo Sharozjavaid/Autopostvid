@@ -17,6 +17,9 @@ import {
   removeAutomationTopic,
   getAutomationRuns,
   retryTikTokPost,
+  postRunNow,
+  getAutomationQueue,
+  skipQueueItem,
   API_BASE_URL,
 } from '../api/client';
 import type {
@@ -25,6 +28,7 @@ import type {
   ContentType,
   ImageStyle,
   AutomationCreate,
+  AutomationQueueStatus,
 } from '../api/client';
 
 // Icons
@@ -96,6 +100,30 @@ const TikTokIcon = () => (
   </svg>
 );
 
+const InstagramIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+  </svg>
+);
+
+const SkipIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polygon points="5 4 15 12 5 20 5 4"/>
+    <line x1="19" y1="5" x2="19" y2="19"/>
+  </svg>
+);
+
+const QueueIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="8" y1="6" x2="21" y2="6"/>
+    <line x1="8" y1="12" x2="21" y2="12"/>
+    <line x1="8" y1="18" x2="21" y2="18"/>
+    <line x1="3" y1="6" x2="3.01" y2="6"/>
+    <line x1="3" y1="12" x2="3.01" y2="12"/>
+    <line x1="3" y1="18" x2="3.01" y2="18"/>
+  </svg>
+);
+
 const CheckIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="20 6 9 17 4 12"/>
@@ -134,15 +162,27 @@ const ChevronUpIcon = () => (
 const getAutomationImageUrl = (imagePath: string): string => {
   if (!imagePath) return '';
 
-  // If it's already a full URL, use it
+  // If it's already a full URL (GCS), use it directly
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
     return imagePath;
   }
 
   // For automation images, they're stored in generated_slideshows/
-  // The static mount is at /static/slides/ which maps to generated_slideshows/
-  const filename = imagePath.replace('generated_slideshows/', '');
-  return `${API_BASE_URL}/static/slides/${filename}`;
+  // The static mount is at /static/slideshows/ which maps to generated_slideshows/
+  // Path format: generated_slideshows/gpt15/filename.png -> /static/slideshows/gpt15/filename.png
+  if (imagePath.includes('generated_slideshows/')) {
+    const relativePath = imagePath.replace('generated_slideshows/', '');
+    return `${API_BASE_URL}/static/slideshows/${relativePath}`;
+  }
+  
+  // For project slides (generated_slides/)
+  if (imagePath.includes('generated_slides/')) {
+    const filename = imagePath.split('/').pop();
+    return `${API_BASE_URL}/static/slides/${filename}`;
+  }
+  
+  // Fallback: assume it's a relative path under slideshows
+  return `${API_BASE_URL}/static/slideshows/${imagePath}`;
 };
 
 const DAYS_OF_WEEK = [
@@ -163,6 +203,8 @@ export default function Automations() {
   const [showSampleModal, setShowSampleModal] = useState(false);
   const [showRunsModal, setShowRunsModal] = useState(false);
   const [runsAutomation, setRunsAutomation] = useState<Automation | null>(null);
+  const [showQueueModal, setShowQueueModal] = useState(false);
+  const [queueAutomation, setQueueAutomation] = useState<Automation | null>(null);
 
   // Queries
   const { data: automationsData, isLoading } = useQuery({
@@ -267,6 +309,10 @@ export default function Automations() {
                 setRunsAutomation(automation);
                 setShowRunsModal(true);
               }}
+              onShowQueue={() => {
+                setQueueAutomation(automation);
+                setShowQueueModal(true);
+              }}
               isLoading={sampleMutation.isPending && sampleMutation.variables === automation.id}
             />
           ))}
@@ -327,6 +373,19 @@ export default function Automations() {
           />
         )}
       </AnimatePresence>
+
+      {/* Queue Modal */}
+      <AnimatePresence>
+        {showQueueModal && queueAutomation && (
+          <QueueModal
+            automation={queueAutomation}
+            onClose={() => {
+              setShowQueueModal(false);
+              setQueueAutomation(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -345,6 +404,7 @@ interface AutomationCardProps {
   onSample: () => void;
   onDelete: () => void;
   onShowRuns: () => void;
+  onShowQueue: () => void;
   isLoading: boolean;
 }
 
@@ -358,11 +418,18 @@ function AutomationCard({
   onSample,
   onDelete,
   onShowRuns,
+  onShowQueue,
   isLoading,
 }: AutomationCardProps) {
   const contentType = contentTypes.find(ct => ct.id === automation.content_type);
   const imageStyle = imageStyles.find(is => is.id === automation.image_style);
   const isRunning = automation.status === 'running';
+  const hasProjectQueue = automation.project_ids && automation.project_ids.length > 0;
+  const queueMode = hasProjectQueue ? 'projects' : 'topics';
+  const queueCount = hasProjectQueue ? automation.project_ids.length : (automation.topics?.length || 0);
+  const queueRemaining = hasProjectQueue 
+    ? automation.project_ids.length - automation.current_project_index 
+    : automation.topics?.length || 0;
 
   return (
     <GlassCard padding="lg">
@@ -419,7 +486,7 @@ function AutomationCard({
         {/* Stats */}
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(3, 1fr)', 
+          gridTemplateColumns: 'repeat(4, 1fr)', 
           gap: '12px', 
           marginBottom: '16px',
           padding: '12px',
@@ -427,18 +494,48 @@ function AutomationCard({
           borderRadius: '12px',
         }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '22px', fontWeight: '700', color: '#334155' }}>{automation.topics?.length || 0}</div>
-            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Topics</div>
+            <div style={{ fontSize: '20px', fontWeight: '700', color: hasProjectQueue ? '#8b5cf6' : '#334155' }}>
+              {queueRemaining}
+            </div>
+            <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '500' }}>
+              {hasProjectQueue ? 'Projects' : 'Topics'}
+            </div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '22px', fontWeight: '700', color: '#16a34a' }}>{automation.successful_runs}</div>
-            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Completed</div>
+            <div style={{ fontSize: '20px', fontWeight: '700', color: '#334155' }}>{automation.total_runs}</div>
+            <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '500' }}>Total</div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '22px', fontWeight: '700', color: '#dc2626' }}>{automation.failed_runs}</div>
-            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Failed</div>
+            <div style={{ fontSize: '20px', fontWeight: '700', color: '#16a34a' }}>{automation.successful_runs}</div>
+            <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '500' }}>Success</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '20px', fontWeight: '700', color: '#dc2626' }}>{automation.failed_runs}</div>
+            <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '500' }}>Failed</div>
           </div>
         </div>
+
+        {/* Queue Mode Badge */}
+        {hasProjectQueue && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '12px',
+            padding: '10px 14px',
+            background: 'rgba(139, 92, 246, 0.1)',
+            borderRadius: '10px',
+            border: '1px solid rgba(139, 92, 246, 0.2)',
+          }}>
+            <QueueIcon />
+            <span style={{ fontSize: '13px', color: '#a78bfa', fontWeight: '500' }}>
+              Project Queue Mode
+            </span>
+            <span style={{ fontSize: '12px', color: 'rgba(167, 139, 250, 0.7)' }}>
+              ({automation.current_project_index}/{queueCount} processed)
+            </span>
+          </div>
+        )}
 
         {/* Schedule Info */}
         {automation.schedule_times && automation.schedule_times.length > 0 && (
@@ -484,30 +581,29 @@ function AutomationCard({
         )}
 
         {/* Actions */}
-        <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' }}>
           {isRunning ? (
-            <Button variant="secondary" onClick={onStop} style={{ flex: 1 }}>
+            <Button variant="secondary" onClick={onStop} style={{ flex: '1 1 auto' }}>
               <StopIcon /> Stop
             </Button>
           ) : (
-            <Button onClick={onStart} style={{ flex: 1 }}>
+            <Button onClick={onStart} style={{ flex: '1 1 auto' }}>
               <PlayIcon /> Start
             </Button>
           )}
           <Button
             variant="secondary"
-            onClick={onShowRuns}
-            style={{ flex: 1 }}
+            onClick={onShowQueue}
+            style={{ flex: '1 1 auto' }}
           >
-            <HistoryIcon /> Runs
+            <QueueIcon /> Queue
           </Button>
           <Button
             variant="secondary"
-            onClick={onSample}
-            disabled={isLoading}
-            style={{ flex: 1 }}
+            onClick={onShowRuns}
+            style={{ flex: '1 1 auto' }}
           >
-            <SampleIcon /> {isLoading ? '...' : 'Sample'}
+            <HistoryIcon /> Runs
           </Button>
           <Button variant="secondary" onClick={onSelect} style={{ padding: '8px 12px' }}>
             Edit
@@ -1364,6 +1460,45 @@ function RunsHistoryModal({ automation, onClose }: RunsHistoryModalProps) {
     },
   });
 
+  const [postingRunId, setPostingRunId] = useState<string | null>(null);
+  const [postingPlatform, setPostingPlatform] = useState<string | null>(null);
+
+  const postNowMutation = useMutation({
+    mutationFn: ({ runId, platform }: { runId: string; platform: 'tiktok' | 'instagram' | 'both' }) => 
+      postRunNow(automation.id, runId, platform),
+    onMutate: ({ runId, platform }) => {
+      setPostingRunId(runId);
+      setPostingPlatform(platform);
+      setRetryMessage(null);
+    },
+    onSuccess: (data, { runId, platform }) => {
+      setPostingRunId(null);
+      setPostingPlatform(null);
+      
+      const tiktokResult = data.results.tiktok;
+      const igResult = data.results.instagram;
+      
+      let message = '';
+      if (tiktokResult?.success) message += 'TikTok ✓ ';
+      if (tiktokResult && !tiktokResult.success) message += `TikTok failed: ${tiktokResult.error} `;
+      if (igResult?.success) message += 'Instagram ✓';
+      if (igResult && !igResult.success) message += `Instagram failed: ${igResult.error}`;
+      
+      setRetryMessage({ 
+        runId, 
+        success: data.success, 
+        message: message || (data.success ? 'Posted!' : 'Failed to post')
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['automation-runs', automation.id] });
+    },
+    onError: (error: Error, { runId }) => {
+      setPostingRunId(null);
+      setPostingPlatform(null);
+      setRetryMessage({ runId, success: false, message: error.message });
+    },
+  });
+
   const runs = runsData?.runs || [];
 
   const formatDuration = (seconds: number | null) => {
@@ -1402,6 +1537,22 @@ function RunsHistoryModal({ automation, onClose }: RunsHistoryModalProps) {
     return { label: '-', color: '#64748b', bg: 'transparent' };
   };
 
+  const getInstagramStatus = (run: AutomationRun) => {
+    if (run.instagram_posted && run.instagram_post_status === 'posted') {
+      return { label: 'Posted', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' };
+    }
+    if (run.instagram_post_status === 'pending') {
+      return { label: 'Processing', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' };
+    }
+    if (run.instagram_post_status === 'failed' || run.instagram_error) {
+      return { label: 'Failed', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' };
+    }
+    if (run.status === 'completed' && !run.instagram_posted) {
+      return { label: 'Not Posted', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)' };
+    }
+    return { label: '-', color: '#64748b', bg: 'transparent' };
+  };
+
   const canRetry = (run: AutomationRun) => {
     // Can retry if completed/posted but TikTok failed or wasn't attempted
     return (
@@ -1409,6 +1560,15 @@ function RunsHistoryModal({ automation, onClose }: RunsHistoryModalProps) {
       run.image_paths &&
       run.image_paths.length >= 2 &&
       (run.tiktok_post_status === 'failed' || !run.tiktok_posted)
+    );
+  };
+
+  const canPostInstagram = (run: AutomationRun) => {
+    return (
+      (run.status === 'completed' || run.status === 'posted') &&
+      run.image_paths &&
+      run.image_paths.length >= 2 &&
+      (run.instagram_post_status === 'failed' || !run.instagram_posted)
     );
   };
 
@@ -1496,8 +1656,11 @@ function RunsHistoryModal({ automation, onClose }: RunsHistoryModalProps) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {runs.map((run) => {
               const tiktokStatus = getTikTokStatus(run);
+              const instagramStatus = getInstagramStatus(run);
               const showRetry = canRetry(run);
+              const showPostInstagram = canPostInstagram(run);
               const isRetrying = retryingRunId === run.id;
+              const isPosting = postingRunId === run.id;
               const messageForRun = retryMessage?.runId === run.id ? retryMessage : null;
 
               return (
@@ -1537,8 +1700,8 @@ function RunsHistoryModal({ automation, onClose }: RunsHistoryModalProps) {
                       </div>
                     </div>
 
-                    {/* Right: Status and actions */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                    {/* Right: Status */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
                       {/* Run Status */}
                       <span style={{
                         padding: '4px 10px',
@@ -1560,12 +1723,12 @@ function RunsHistoryModal({ automation, onClose }: RunsHistoryModalProps) {
                       </span>
 
                       {/* TikTok Status */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <TikTokIcon />
                         <span style={{
-                          padding: '4px 10px',
+                          padding: '4px 8px',
                           borderRadius: '6px',
-                          fontSize: '11px',
+                          fontSize: '10px',
                           fontWeight: '500',
                           background: tiktokStatus.bg,
                           color: tiktokStatus.color,
@@ -1574,28 +1737,85 @@ function RunsHistoryModal({ automation, onClose }: RunsHistoryModalProps) {
                         </span>
                       </div>
 
-                      {/* Retry Button */}
+                      {/* Instagram Status */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <InstagramIcon />
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          fontSize: '10px',
+                          fontWeight: '500',
+                          background: instagramStatus.bg,
+                          color: instagramStatus.color,
+                        }}>
+                          {instagramStatus.label}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Post Now Buttons */}
+                  {(showRetry || showPostInstagram) && (
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
                       {showRetry && (
                         <Button
                           variant="secondary"
-                          onClick={() => retryMutation.mutate(run.id)}
-                          disabled={isRetrying}
+                          onClick={() => postNowMutation.mutate({ runId: run.id, platform: 'tiktok' })}
+                          disabled={isPosting || isRetrying}
                           style={{
                             padding: '6px 12px',
-                            fontSize: '12px',
+                            fontSize: '11px',
+                            background: 'rgba(0, 0, 0, 0.3)',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                          }}
+                        >
+                          {isPosting && postingPlatform === 'tiktok' ? (
+                            <>Posting...</>
+                          ) : (
+                            <><TikTokIcon /> Post to TikTok</>
+                          )}
+                        </Button>
+                      )}
+                      {showPostInstagram && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => postNowMutation.mutate({ runId: run.id, platform: 'instagram' })}
+                          disabled={isPosting || isRetrying}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '11px',
+                            background: 'rgba(225, 48, 108, 0.15)',
+                            border: '1px solid rgba(225, 48, 108, 0.3)',
+                          }}
+                        >
+                          {isPosting && postingPlatform === 'instagram' ? (
+                            <>Posting...</>
+                          ) : (
+                            <><InstagramIcon /> Post to Instagram</>
+                          )}
+                        </Button>
+                      )}
+                      {showRetry && showPostInstagram && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => postNowMutation.mutate({ runId: run.id, platform: 'both' })}
+                          disabled={isPosting || isRetrying}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '11px',
                             background: 'rgba(99, 102, 241, 0.2)',
                             border: '1px solid rgba(99, 102, 241, 0.4)',
                           }}
                         >
-                          {isRetrying ? (
-                            <>Retrying...</>
+                          {isPosting && postingPlatform === 'both' ? (
+                            <>Posting...</>
                           ) : (
-                            <><RefreshIcon /> Retry TikTok</>
+                            <>Post to Both</>
                           )}
                         </Button>
                       )}
                     </div>
-                  </div>
+                  )
 
                   {/* View Slides Button */}
                   {run.image_paths && run.image_paths.length > 0 && (
@@ -1802,6 +2022,259 @@ function RunsHistoryModal({ automation, onClose }: RunsHistoryModalProps) {
           </motion.div>
         )}
       </AnimatePresence>
+    </motion.div>
+  );
+}
+
+
+// =============================================================================
+// QUEUE MODAL
+// =============================================================================
+
+interface QueueModalProps {
+  automation: Automation;
+  onClose: () => void;
+}
+
+function QueueModal({ automation, onClose }: QueueModalProps) {
+  const queryClient = useQueryClient();
+
+  // Fetch queue status
+  const { data: queueData, isLoading } = useQuery({
+    queryKey: ['automation-queue', automation.id],
+    queryFn: () => getAutomationQueue(automation.id),
+  });
+
+  const skipMutation = useMutation({
+    mutationFn: () => skipQueueItem(automation.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['automation-queue', automation.id] });
+      queryClient.invalidateQueries({ queryKey: ['automations'] });
+    },
+  });
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <span style={{ color: '#22c55e' }}>✓</span>;
+      case 'current':
+        return <span style={{ color: '#f59e0b' }}>▶</span>;
+      default:
+        return <span style={{ color: '#64748b' }}>○</span>;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return { bg: 'rgba(34, 197, 94, 0.1)', border: 'rgba(34, 197, 94, 0.3)' };
+      case 'current':
+        return { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.4)' };
+      default:
+        return { bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.08)' };
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.8)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '24px',
+      }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'linear-gradient(135deg, rgba(30, 30, 50, 0.95), rgba(20, 20, 35, 0.95))',
+          borderRadius: '16px',
+          padding: '32px',
+          maxWidth: '700px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          border: '1px solid rgba(255,255,255,0.1)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <div>
+            <h2 style={{ fontSize: '24px', fontWeight: '600', color: '#fff', marginBottom: '4px' }}>
+              Queue
+            </h2>
+            <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.5)' }}>
+              {automation.name}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(255,255,255,0.1)',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '8px 12px',
+              color: '#fff',
+              cursor: 'pointer',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Queue Stats */}
+        {queueData && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '12px',
+            marginBottom: '24px',
+            padding: '16px',
+            background: 'rgba(255,255,255,0.03)',
+            borderRadius: '12px',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>Mode</div>
+              <div style={{ 
+                fontSize: '13px', 
+                fontWeight: '600', 
+                color: queueData.queue_mode === 'projects' ? '#a78bfa' : '#60a5fa',
+                textTransform: 'capitalize',
+              }}>
+                {queueData.queue_mode}
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>Total</div>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: '#fff' }}>{queueData.total_items}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>Current</div>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: '#f59e0b' }}>{queueData.current_index + 1}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>Remaining</div>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: '#22c55e' }}>{queueData.remaining}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Queue Exhausted Warning */}
+        {queueData?.is_exhausted && (
+          <div style={{
+            padding: '12px 16px',
+            background: 'rgba(245, 158, 11, 0.1)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            borderRadius: '8px',
+            marginBottom: '24px',
+          }}>
+            <p style={{ color: '#fbbf24', fontSize: '13px' }}>
+              ⚠️ Queue exhausted. Add more {queueData.queue_mode} to continue automation.
+            </p>
+          </div>
+        )}
+
+        {/* Skip Button */}
+        {queueData && !queueData.is_exhausted && (
+          <div style={{ marginBottom: '24px' }}>
+            <Button
+              variant="secondary"
+              onClick={() => skipMutation.mutate()}
+              disabled={skipMutation.isPending}
+              style={{ 
+                background: 'rgba(99, 102, 241, 0.15)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+              }}
+            >
+              <SkipIcon /> {skipMutation.isPending ? 'Skipping...' : 'Skip Current Item'}
+            </Button>
+          </div>
+        )}
+
+        {/* Queue Items */}
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '48px', color: 'rgba(255,255,255,0.5)' }}>
+            Loading queue...
+          </div>
+        ) : queueData?.items.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '48px', color: 'rgba(255,255,255,0.5)' }}>
+            No items in queue. Add topics or projects to get started.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {queueData?.items.map((item) => {
+              const statusColors = getStatusColor(item.status);
+              return (
+                <div
+                  key={item.index}
+                  style={{
+                    padding: '14px 16px',
+                    background: statusColors.bg,
+                    border: `1px solid ${statusColors.border}`,
+                    borderRadius: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                  }}
+                >
+                  <span style={{ fontSize: '16px', width: '24px', textAlign: 'center' }}>
+                    {getStatusIcon(item.status)}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{
+                      color: item.status === 'current' ? '#fbbf24' : '#fff',
+                      fontSize: '14px',
+                      fontWeight: item.status === 'current' ? '600' : '400',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {item.title}
+                    </p>
+                    {item.type === 'project' && item.id && (
+                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
+                        Project ID: {item.id.slice(0, 8)}...
+                      </p>
+                    )}
+                  </div>
+                  <span style={{
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    fontSize: '10px',
+                    fontWeight: '600',
+                    textTransform: 'uppercase',
+                    background: item.status === 'completed' ? 'rgba(34, 197, 94, 0.2)' :
+                               item.status === 'current' ? 'rgba(245, 158, 11, 0.2)' :
+                               'rgba(100, 116, 139, 0.2)',
+                    color: item.status === 'completed' ? '#4ade80' :
+                           item.status === 'current' ? '#fbbf24' :
+                           '#94a3b8',
+                  }}>
+                    {item.status}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
+          <Button onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </motion.div>
     </motion.div>
   );
 }

@@ -333,6 +333,8 @@ export interface Automation {
   image_style: string;
   topics: string[];
   current_topic_index: number;
+  project_ids: string[];  // Pre-created projects queue
+  current_project_index: number;
   schedule_times: string[];
   schedule_days: string[];
   email_enabled: boolean;
@@ -344,6 +346,8 @@ export interface Automation {
     auto_generate_images?: boolean;
     image_model?: string;
     font?: string;
+    post_to_tiktok?: boolean;
+    post_to_instagram?: boolean;
   };
   status: 'running' | 'stopped' | 'paused';
   is_active: boolean;
@@ -496,9 +500,34 @@ export interface AutomationRun {
   tiktok_publish_id: string | null;
   tiktok_post_status: 'pending' | 'processing' | 'success' | 'failed' | null;
   tiktok_error: string | null;
+  instagram_posted: boolean;
+  instagram_post_id: string | null;
+  instagram_post_status: 'pending' | 'posted' | 'failed' | null;
+  instagram_error: string | null;
   error_message: string | null;
   settings_used: Record<string, unknown>;
   created_at: string | null;
+}
+
+// Automation Queue
+export interface AutomationQueueItem {
+  index: number;
+  type: 'project' | 'topic';
+  id?: string;
+  title: string;
+  topic?: string;
+  status: 'completed' | 'current' | 'pending';
+}
+
+export interface AutomationQueueStatus {
+  automation_id: string;
+  automation_name: string;
+  queue_mode: 'projects' | 'topics';
+  total_items: number;
+  current_index: number;
+  remaining: number;
+  is_exhausted: boolean;
+  items: AutomationQueueItem[];
 }
 
 export const getAutomationRuns = async (
@@ -514,6 +543,73 @@ export const getAutomationRun = async (
   runId: string
 ): Promise<AutomationRun> => {
   const response = await api.get(`/api/automations/${automationId}/runs/${runId}`);
+  return response.data;
+};
+
+// Post Now - post a completed run to social media
+export const postRunNow = async (
+  automationId: string,
+  runId: string,
+  platform: 'tiktok' | 'instagram' | 'both' = 'tiktok'
+): Promise<{
+  success: boolean;
+  run_id: string;
+  results: {
+    tiktok?: { success: boolean; publish_id?: string; error?: string };
+    instagram?: { success: boolean; post_id?: string; error?: string };
+  };
+}> => {
+  const response = await api.post(
+    `/api/automations/${automationId}/runs/${runId}/post-now`,
+    null,
+    { params: { platform } }
+  );
+  return response.data;
+};
+
+// Queue Management
+export const getAutomationQueue = async (
+  automationId: string
+): Promise<AutomationQueueStatus> => {
+  const response = await api.get(`/api/automations/${automationId}/queue`);
+  return response.data;
+};
+
+export const addProjectsToQueue = async (
+  automationId: string,
+  projectIds: string[],
+  append: boolean = false
+): Promise<{
+  success: boolean;
+  automation_id: string;
+  project_ids: string[];
+  total_queued: number;
+  current_index: number;
+  remaining: number;
+}> => {
+  const response = await api.post(`/api/automations/${automationId}/queue/projects`, {
+    project_ids: projectIds,
+    append,
+  });
+  return response.data;
+};
+
+export const skipQueueItem = async (
+  automationId: string
+): Promise<{
+  success: boolean;
+  skipped: { index: number; project_id?: string; topic?: string };
+  new_index: number;
+  remaining: number;
+}> => {
+  const response = await api.post(`/api/automations/${automationId}/queue/skip`);
+  return response.data;
+};
+
+export const clearProjectQueue = async (
+  automationId: string
+): Promise<{ success: boolean; message: string; queue_mode: string }> => {
+  const response = await api.delete(`/api/automations/${automationId}/queue/projects`);
   return response.data;
 };
 
