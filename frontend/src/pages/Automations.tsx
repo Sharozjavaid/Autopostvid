@@ -12,11 +12,9 @@ import {
   deleteAutomation,
   startAutomation,
   stopAutomation,
-  generateAutomationSample,
   addAutomationTopic,
   removeAutomationTopic,
   getAutomationRuns,
-  retryTikTokPost,
   postRunNow,
   getAutomationQueue,
   skipQueueItem,
@@ -28,7 +26,6 @@ import type {
   ContentType,
   ImageStyle,
   AutomationCreate,
-  AutomationQueueStatus,
 } from '../api/client';
 
 // Icons
@@ -58,14 +55,6 @@ const TrashIcon = () => (
   </svg>
 );
 
-const SampleIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-    <circle cx="8.5" cy="8.5" r="1.5"/>
-    <polyline points="21 15 16 10 5 21"/>
-  </svg>
-);
-
 const ClockIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="10"/>
@@ -84,13 +73,6 @@ const HistoryIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="10"/>
     <polyline points="12 6 12 12 16 14"/>
-  </svg>
-);
-
-const RefreshIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="23 4 23 10 17 10"/>
-    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
   </svg>
 );
 
@@ -249,14 +231,6 @@ export default function Automations() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['automations'] }),
   });
 
-  const sampleMutation = useMutation({
-    mutationFn: generateAutomationSample,
-    onSuccess: (data) => {
-      setSampleResult(data);
-      setShowSampleModal(true);
-    },
-  });
-
   const automations = automationsData?.automations || [];
 
   return (
@@ -303,7 +277,6 @@ export default function Automations() {
               onSelect={() => setSelectedAutomation(automation)}
               onStart={() => startMutation.mutate(automation.id)}
               onStop={() => stopMutation.mutate(automation.id)}
-              onSample={() => sampleMutation.mutate(automation.id)}
               onDelete={() => deleteMutation.mutate(automation.id)}
               onShowRuns={() => {
                 setRunsAutomation(automation);
@@ -313,7 +286,6 @@ export default function Automations() {
                 setQueueAutomation(automation);
                 setShowQueueModal(true);
               }}
-              isLoading={sampleMutation.isPending && sampleMutation.variables === automation.id}
             />
           ))}
         </div>
@@ -401,11 +373,9 @@ interface AutomationCardProps {
   onSelect: () => void;
   onStart: () => void;
   onStop: () => void;
-  onSample: () => void;
   onDelete: () => void;
   onShowRuns: () => void;
   onShowQueue: () => void;
-  isLoading: boolean;
 }
 
 function AutomationCard({
@@ -415,17 +385,14 @@ function AutomationCard({
   onSelect,
   onStart,
   onStop,
-  onSample,
   onDelete,
   onShowRuns,
   onShowQueue,
-  isLoading,
 }: AutomationCardProps) {
   const contentType = contentTypes.find(ct => ct.id === automation.content_type);
   const imageStyle = imageStyles.find(is => is.id === automation.image_style);
   const isRunning = automation.status === 'running';
   const hasProjectQueue = automation.project_ids && automation.project_ids.length > 0;
-  const queueMode = hasProjectQueue ? 'projects' : 'topics';
   const queueCount = hasProjectQueue ? automation.project_ids.length : (automation.topics?.length || 0);
   const queueRemaining = hasProjectQueue 
     ? automation.project_ids.length - automation.current_project_index 
@@ -1424,7 +1391,7 @@ interface RunsHistoryModalProps {
 
 function RunsHistoryModal({ automation, onClose }: RunsHistoryModalProps) {
   const queryClient = useQueryClient();
-  const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
+  const [retryingRunId, _setRetryingRunId] = useState<string | null>(null);
   const [retryMessage, setRetryMessage] = useState<{ runId: string; success: boolean; message: string } | null>(null);
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
@@ -1433,31 +1400,6 @@ function RunsHistoryModal({ automation, onClose }: RunsHistoryModalProps) {
   const { data: runsData, isLoading } = useQuery({
     queryKey: ['automation-runs', automation.id],
     queryFn: () => getAutomationRuns(automation.id, 20),
-  });
-
-  const retryMutation = useMutation({
-    mutationFn: (runId: string) => retryTikTokPost(automation.id, runId),
-    onMutate: (runId) => {
-      setRetryingRunId(runId);
-      setRetryMessage(null);
-    },
-    onSuccess: (data, runId) => {
-      setRetryingRunId(null);
-      if (data.success) {
-        setRetryMessage({ runId, success: true, message: data.message || 'Posted to TikTok drafts!' });
-      } else {
-        setRetryMessage({ 
-          runId, 
-          success: false, 
-          message: data.error || 'Failed to post'
-        });
-      }
-      queryClient.invalidateQueries({ queryKey: ['automation-runs', automation.id] });
-    },
-    onError: (error: Error, runId) => {
-      setRetryingRunId(null);
-      setRetryMessage({ runId, success: false, message: error.message });
-    },
   });
 
   const [postingRunId, setPostingRunId] = useState<string | null>(null);
@@ -1471,7 +1413,7 @@ function RunsHistoryModal({ automation, onClose }: RunsHistoryModalProps) {
       setPostingPlatform(platform);
       setRetryMessage(null);
     },
-    onSuccess: (data, { runId, platform }) => {
+    onSuccess: (data, { runId }) => {
       setPostingRunId(null);
       setPostingPlatform(null);
       
