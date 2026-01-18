@@ -1815,7 +1815,7 @@ function RunsHistoryModal({ automation, onClose }: RunsHistoryModalProps) {
                         </Button>
                       )}
                     </div>
-                  )
+                  )}
 
                   {/* View Slides Button */}
                   {run.image_paths && run.image_paths.length > 0 && (
